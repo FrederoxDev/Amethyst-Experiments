@@ -8,9 +8,13 @@ set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo" CACHE STRING "Build configuration
 set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo" FORCE)
 set(CMAKE_CXX_STANDARD 23)
 
+add_compile_definitions(_ITERATOR_DEBUG_LEVEL=0)
+set_property(GLOBAL PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+
 # Build into %appdata%/Amethyst
 set(AmethystFolder "$ENV{localappdata}/Packages/Microsoft.MinecraftUWP_8wekyb3d8bbwe/AC/Amethyst/")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${AmethystFolder}/mods/${PROJECT_NAME}@${MOD_VERSION}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${AmethystFolder}/mods/${PROJECT_NAME}@${MOD_VERSION}")
 
 # Include Amethyst
 find_library(AMETHYST_API AmethystAPI PATHS "${AmethystFolder}/lib")

@@ -5,6 +5,11 @@
 #include <amethyst/InputManager.h>
 #include <minecraft/src/common/world/item/Item.h>
 #include <amethyst/MinecraftVtables.h>
+#include <minecraft/src/common/world/item/registry/ItemRegistryRef.h>
+#include <minecraft/src/common/world/item/VanillaItems.h>
+#include <minecraft/src-deps/core/string/StringHash.h>
+#include <cstdarg>
+#include <minecraft/src/common/resources/BaseGameVersion.h>
 
 #define ModFunction extern "C" __declspec(dllexport)
 

@@ -1,24 +1,35 @@
 ﻿#include "dllmain.h"
 
-SafetyHookInline _Item_appendFormattedHoverText;
+SafetyHookInline _VanillaItems_registerItems;
+SafetyHookInline _handleAssert;
 
-//void Item_appendFormattedHovertext(Item* self, const ItemStackBase& itemStack, Level& level, std::string& text, uint8_t a5) {
-//    _Item_appendFormattedHoverText.call<void, Item*, const ItemStackBase&, Level&, std::string&, uint8_t>(self, itemStack, level, text, a5);
-//    Log::Info("{}", self->mId);
-//}
+void* VanillaItems_registerItems(
+    const ItemRegistryRef itemRegistry, 
+    const BaseGameVersion* baseGameVersion, 
+    const Experiments* experiments, 
+    void* enableExperimentalGameplay
+) {
+    //_VanillaItems_registerItems.call<void, const ItemRegistryRef, const BaseGameVersion*, const Experiments*, bool>(itemRegistry, baseGameVersion, experiments, enableExperimentalGameplay);
+    Log::Info("VanillaItems::registerItems");
+
+    Item* item = new Item("minecraft:test_item", 999);
+    SharedPtr<Item> sharedItem(item);
+
+    void* res = _VanillaItems_registerItems.fastcall<void*>(&itemRegistry, baseGameVersion, experiments, enableExperimentalGameplay);
+
+    std::shared_ptr<ItemRegistry> registry = itemRegistry._lockRegistry();
+    
+    registry->registerItem(sharedItem);
+
+    return res;
+}
 
 ModFunction void Initialize(HookManager* hookManager, Amethyst::EventManager* eventManager, InputManager* inputManager) 
 {
     InitializeVtablePtrs();
 
-    // Not really the correct time to construct an item yet, just a proof of concept for virtuals right now
-    Item testItem("minecraft:test_item", 999);
-    Log::Info("isBucket: {}", testItem.isBucket());
-    Log::Info("mId: {}", testItem.mId); 
+    hookManager->RegisterFunction(&VanillaItems::registerItems, "40 55 53 56 57 41 54 41 56 41 57 48 8D AC 24 ? ? ? ? B8 ? ? ? ? E8 ? ? ? ? 48 2B E0 0F 29 B4 24");
+    hookManager->CreateHook(&VanillaItems::registerItems, _VanillaItems_registerItems, &VanillaItems_registerItems);
 
-    /*hookManager->CreateHookAbsolute(
-        _Item_appendFormattedHoverText,
-        SigScan("40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 49 8B F1 4C 89 44 24 ? 4C 8B F2 48 8B D9"),
-        &Item_appendFormattedHovertext
-    );*/
+    //hookManager->CreateHookAbsolute(_handleAssert, SigScan("4C 8B DC 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 4C 8B D1"), &handleAssert);
 }
