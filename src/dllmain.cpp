@@ -14,19 +14,19 @@ void* VanillaItems_registerItems(
 
     void* res = _VanillaItems_registerItems.fastcall<void*>(&itemRegistry, baseGameVersion, experiments, enableExperimentalGameplay);
 
-    std::shared_ptr<ItemRegistry>* registry = new std::shared_ptr<ItemRegistry>();
-    itemRegistry._lockRegistry(&registry);
+    std::shared_ptr<ItemRegistry>* sharedRegistryPtr = new std::shared_ptr<ItemRegistry>();
+    itemRegistry._lockRegistry(&sharedRegistryPtr);
 
-    Log::Info("mMaxItemID: {}", registry->get()->mMaxItemID);
+    ItemRegistry* registry = sharedRegistryPtr->get();
 
-    ++registry->get()->mMaxItemID;
+    Log::Info("minecraft:test_item {}", ++registry->mMaxItemID);
+    Item* item = new Item("minecraft:test_item", registry->mMaxItemID);
+    item->setIconInfo("diamond", 0);
 
-    Log::Info("minecraft:test_item {}", registry->get()->mMaxItemID);
-    Item* item = new Item("minecraft:test_item", registry->get()->mMaxItemID);
     SharedPtr<Item> sharedItem(item);
-    
-    registry->get()->registerItem(sharedItem);
+    registry->registerItem(sharedItem);
 
+    delete sharedRegistryPtr;
     return res;
 }
 
