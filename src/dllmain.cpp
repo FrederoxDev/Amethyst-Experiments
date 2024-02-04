@@ -3,15 +3,34 @@
 SafetyHookInline _VanillaItems_registerItems;
 SafetyHookInline _handleAssert;
 
+class TestItem : public Item {
+public:
+    TestItem(const std::string& identifier, short mId) : Item(identifier, mId)
+    {
+        setMaxDamage(10);
+        setIconInfo("diamond", 0);
+    }
+
+    virtual void fixupCommon(ItemStackBase&) const override {
+        Log::Info("fixupCommon(ItemStackBase&)");
+    }
+
+    /*virtual void fixupCommon(ItemStackBase&, Level&) const override {
+        Log::Info("fixupCommon(ItemStackBase&, Level&)");
+    }*/
+
+    virtual void appendFormattedHovertext(ItemStackBase const& isb, Level& level, std::string& text, bool b) const override {
+        Item::appendFormattedHovertext(isb, level, text, b);
+        text += "Hello from custom item";
+    }
+};
+
 void* VanillaItems_registerItems(
     const ItemRegistryRef itemRegistry, 
     const BaseGameVersion* baseGameVersion, 
     const Experiments* experiments, 
     void* enableExperimentalGameplay
 ) {
-    //_VanillaItems_registerItems.call<void, const ItemRegistryRef, const BaseGameVersion*, const Experiments*, bool>(itemRegistry, baseGameVersion, experiments, enableExperimentalGameplay);
-    Log::Info("VanillaItems::registerItems");
-
     void* res = _VanillaItems_registerItems.fastcall<void*>(&itemRegistry, baseGameVersion, experiments, enableExperimentalGameplay);
 
     std::shared_ptr<ItemRegistry>* sharedRegistryPtr = new std::shared_ptr<ItemRegistry>();
@@ -20,13 +39,17 @@ void* VanillaItems_registerItems(
     ItemRegistry* registry = sharedRegistryPtr->get();
 
     Log::Info("minecraft:test_item {}", ++registry->mMaxItemID);
-    Item* item = new Item("minecraft:test_item", registry->mMaxItemID);
-    item->setIconInfo("diamond", 0);
+    Item* item = new TestItem("minecraft:test_item", registry->mMaxItemID);
+
+    // Replace with regular item vtable
+   /* uintptr_t* vtablePtr = *reinterpret_cast<uintptr_t**>(&item);
+    *vtablePtr = SlideAddress(0x53C9B70);*/
 
     SharedPtr<Item> sharedItem(item);
     registry->registerItem(sharedItem);
 
-    delete sharedRegistryPtr;
+    Log::Info("Registered Item");
+
     return res;
 }
 
