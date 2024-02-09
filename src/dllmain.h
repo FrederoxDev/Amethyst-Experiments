@@ -10,6 +10,7 @@
 #include <minecraft/src-deps/core/string/StringHash.h>
 #include <cstdarg>
 #include <minecraft/src/common/resources/BaseGameVersion.h>
+#include <minecraft/src/common/world/level/block/BlockLegacy.h>
 
 #define ModFunction extern "C" __declspec(dllexport)
 

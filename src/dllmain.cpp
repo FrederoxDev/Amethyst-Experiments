@@ -10,11 +10,9 @@ public:
         setIconInfo("diamond", 0);
     }
 
-    virtual void fixupCommon(ItemStackBase&) const override {}
-
     virtual void appendFormattedHovertext(ItemStackBase const& isb, Level& level, std::string& text, bool b) const override {
         Item::appendFormattedHovertext(isb, level, text, b);
-        text += "Hello from custom item";
+        text += "\nHello from custom item";
     }
 
     virtual ItemStack& use(ItemStack& itemStack, Player& player) const override {
@@ -36,6 +34,11 @@ ModFunction void Initialize(HookManager* hookManager, Amethyst::EventManager* ev
     InitializeVtablePtrs();
 
     eventManager->registerItems.AddListener(&RegisterItems);
+
+    Material material;
+
+    BlockLegacy block("minecraft:test_block", 0, material);
+    Log::Info("{}", block.isButtonBlock());
 
     //hookManager->CreateHookAbsolute(_handleAssert, SigScan("4C 8B DC 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 4C 8B D1"), &handleAssert);
 }
