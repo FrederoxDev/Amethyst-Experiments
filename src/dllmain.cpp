@@ -24,16 +24,25 @@ WeakPtr<BlockLegacy> testBlock;
 WeakPtr<BlockItem> testBlockItem;
 
 void RegisterItems(ItemRegistry* registry) {
-    Log::Info("RegisterItems");
-
+    ItemRegistryRef regRef = ItemRegistryManager::getItemRegistry();
+        
     testItem = registry->registerItemShared<TestItem>("minecraft:test_item", ++registry->mMaxItemID);
 
     testBlockItem = registry->registerItemShared<BlockItem>("minecraft:test_block", testBlock->getBlockItemId());
+    HashedString hashedBlockName("minecraft:test_block");
+
+    Block* defaultBlockState = BlockTypeRegistry::getDefaultBlockState(&hashedBlockName);
+    if (defaultBlockState->mLegacyBlock == nullptr) {
+        Log::Info("mLegacyBlock was nullptr!");
+    }
+    else {
+        Log::Info("mLegacyBlock was found!");
+    }
+
+    //Log::Info("{}", defaultBlockState->mLegacyBlock->mID);
 }
 
-SafetyHookInline _BlockDefinitionGroup_registerBlocks;
-
-void BlockDefinitionGroup_registerBlocks(BlockDefinitionGroup* self) {
+void RegisterBlocks(BlockDefinitionGroup* blockDef) {
     Material testMaterial;
     testMaterial.mType = Dirt;
     testMaterial.mNeverBuildable = false;
@@ -46,10 +55,7 @@ void BlockDefinitionGroup_registerBlocks(BlockDefinitionGroup* self) {
     testMaterial.mSolid = true;
     testMaterial.mSuperHot = false;
 
-    testBlock = BlockTypeRegistry::registerBlock<BlockLegacy>("minecraft:test_block", ++self->mLastBlockId, testMaterial);
-
-    Log::Info("BlockDefinitionGroup::registerBlocks");
-    _BlockDefinitionGroup_registerBlocks.thiscall<void>(self);
+    testBlock = BlockTypeRegistry::registerBlock<BlockLegacy>("minecraft:test_block", ++blockDef->mLastBlockId, testMaterial);
 }
 
 ModFunction void Initialize(HookManager* hookManager, Amethyst::EventManager* eventManager, InputManager* inputManager) 
@@ -57,9 +63,5 @@ ModFunction void Initialize(HookManager* hookManager, Amethyst::EventManager* ev
     InitializeVtablePtrs();
 
     eventManager->registerItems.AddListener(&RegisterItems);
-
-    hookManager->RegisterFunction(&BlockDefinitionGroup::registerBlocks, "48 89 5C 24 ? 48 89 6C 24 ? 56 57 41 54 41 56 41 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 4C 8B F9");
-    hookManager->CreateHook(&BlockDefinitionGroup::registerBlocks, _BlockDefinitionGroup_registerBlocks, &BlockDefinitionGroup_registerBlocks);
-
-    //hookManager->CreateHookAbsolute(_handleAssert, SigScan("4C 8B DC 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 4C 8B D1"), &handleAssert);
+    eventManager->registerBlocks.AddListener(&RegisterBlocks);
 }

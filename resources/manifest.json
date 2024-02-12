@@ -1,0 +1,30 @@
+{
+    "format_version": 2,
+    "header": {
+        "description": "amethyst_experiments.description",
+        "name": "amethyst_experiments.name",
+        "uuid": "50b27da2-c5cd-4862-b6a0-edf8a119d2c1",
+        "version": [
+            1,
+            0,
+            0
+        ],
+        "min_engine_version": [
+            1,
+            16,
+            0
+        ]
+    },
+    "modules": [
+        {
+            "description": "amethyst_experiments.description",
+            "type": "resources",
+            "uuid": "a27394ba-0f68-4b08-b899-4e075e6b3539",
+            "version": [
+                1,
+                0,
+                0
+            ]
+        }
+    ]
+}

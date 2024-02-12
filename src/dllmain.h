@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <minecraft/src/common/resources/BaseGameVersion.h>
 #include <minecraft/src/common/world/level/block/BlockLegacy.h>
+#include <minecraft/src/common/world/level/block/Block.h>
 #include <minecraft/src/common/world/level/block/registry/VanillaBlockTypeRegistry.h>
 #include <minecraft/src/common/world/level/block/registry/BlockTypeRegistry.h>
 #include <minecraft/src/common/world/level/block/definition/BlockDefinitionGroup.h>
