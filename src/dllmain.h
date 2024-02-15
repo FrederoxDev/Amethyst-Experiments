@@ -19,6 +19,7 @@
 #include <minecraft/src/common/world/level/block/definition/BlockDefinitionGroup.h>
 #include <minecraft/src-client/common/client/renderer/screen/ScreenContext.h>
 #include <minecraft/src-client/common/client/renderer/helpers/MeshHelpers.h>
+#include <minecraft/src-client/common/client/renderer/game/LevelRenderer.h>
 
 #define ModFunction extern "C" __declspec(dllexport)
 
