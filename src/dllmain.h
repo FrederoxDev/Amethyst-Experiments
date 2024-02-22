@@ -20,6 +20,8 @@
 #include <minecraft/src-client/common/client/renderer/screen/ScreenContext.h>
 #include <minecraft/src-client/common/client/renderer/helpers/MeshHelpers.h>
 #include <minecraft/src-client/common/client/renderer/game/LevelRenderer.h>
+#include <minecraft/src-client/common/client/renderer/block/BlockTessellator.h>
+#include <minecraft/src-client/common/client/renderer/RenderMaterialGroup.h>
 
 #define ModFunction extern "C" __declspec(dllexport)
 
