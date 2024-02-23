@@ -102,9 +102,12 @@ void* renderLevel(LevelRenderer* levelRenderer, ScreenContext* screenContext, Fr
     mce::MaterialPtr material(*mce::RenderMaterialGroup::switchable, hashedMaterialName);
 
     BlockSource* region = ci->getRegion();
-    const Block block = region->getBlock(0, -58, 0);
+    const Block block = region->getBlock(0, -57, 0);
+    BlockPos blockPos(0, -57, 0);
 
-    ci->mBlockTessellator->appendTessellatedBlock(tes, &block);
+    Vec3* cameraPos = &levelRenderer->mLevelRendererPlayer->cameraPos;
+
+    /*ci->mBlockTessellator->appendTessellatedBlock(tes, &block);
 
     Vec3* cameraPos = &levelRenderer->mLevelRendererPlayer->cameraPos;
     BlockPos blockPos(0, -57, 0);
@@ -115,9 +118,32 @@ void* renderLevel(LevelRenderer* levelRenderer, ScreenContext* screenContext, Fr
 
     for (auto& pos : meshData->mPositions) {
         pos = pos + offset;
-    }
+    }*/
 
-    MeshHelpers::renderMeshImmediately(screenContext, tes, &material);
+    tes->begin(mce::TriangleList, 1);
+
+    //ci->mBlockTessellator->tessellateInWorld(*tes, block, blockPos, 0, 0);
+
+    Vec3 inverseCamera(-cameraPos->y, -cameraPos->z, -cameraPos->x);
+    tes->addPostTransformOffset(inverseCamera);
+
+    tes->vertex(0.0f, -56.0f, 0.0f);
+    tes->vertex(1.0f, -56.0f, 0.0f);
+    tes->vertex(0.0f, -56.0f, 1.0f);
+    
+    tes->setPosTransformOffset(Vec3(0.0f, 0.0f, 0.0f));
+
+    Log::Info("mCount: {}", tes->mCount);
+
+    mce::Mesh* mesh = new mce::Mesh();
+    tes->end(mesh, 0, "Test Mesh", 0);
+    tes->clear();
+
+    mesh->renderMesh(screenContext, &material);
+    delete mesh;
+
+    //MeshHelpers::renderMeshImmediately(screenContext, tes, &material);
+    //tes->clear();
 
     void* res = _renderLevel.call<void*>(levelRenderer, screenContext, frameRenderObject);
     return res;
