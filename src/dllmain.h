@@ -1,27 +1,11 @@
 #pragma once
 #include <Windows.h>
-#include <amethyst/events/EventManager.h>
-#include <amethyst/HookManager.h>
-#include <amethyst/InputManager.h>
-#include <minecraft/src/common/world/item/Item.h>
-#include <minecraft/src/common/world/item/BlockItem.h>
-#include <amethyst/MinecraftVtables.h>
-#include <minecraft/src/common/world/item/registry/ItemRegistryRef.h>
-#include <minecraft/src/common/world/item/registry/ItemRegistryManager.h>
-#include <minecraft/src/common/world/item/VanillaItems.h>
-#include <minecraft/src-deps/core/string/StringHash.h>
-#include <cstdarg>
-#include <minecraft/src/common/resources/BaseGameVersion.h>
-#include <minecraft/src/common/world/level/block/BlockLegacy.h>
-#include <minecraft/src/common/world/level/block/Block.h>
-#include <minecraft/src/common/world/level/block/registry/VanillaBlockTypeRegistry.h>
-#include <minecraft/src/common/world/level/block/registry/BlockTypeRegistry.h>
-#include <minecraft/src/common/world/level/block/definition/BlockDefinitionGroup.h>
-#include <minecraft/src-client/common/client/renderer/screen/ScreenContext.h>
-#include <minecraft/src-client/common/client/renderer/helpers/MeshHelpers.h>
-#include <minecraft/src-client/common/client/renderer/game/LevelRenderer.h>
-#include <minecraft/src-client/common/client/renderer/block/BlockTessellator.h>
-#include <minecraft/src-client/common/client/renderer/RenderMaterialGroup.h>
+#include <amethyst/runtime/AmethystContext.h>
+#include <minecraft/src-client/common/client/input/ClientInputHandler.h>
+#include <amethyst/runtime/input/InputManager.h>
+#include <minecraft/src-client/common/client/gui/controls/ToggleComponent.h>
+#include <minecraft/src-client/common/client/gui/controls/SliderComponent.h>
+#include <minecraft/src-client/common/client/gui/controls/TextComponent.h>
 
 #define ModFunction extern "C" __declspec(dllexport)
 

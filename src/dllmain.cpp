@@ -2,172 +2,91 @@
 #include <chrono>
 #include <cmath>
 #include <math.h>
+#include <vector>
 
-ClientInstance* ci;
+AmethystContext* amethyst;
 
-class TestItem : public Item {
-public:
-    TestItem(const std::string& identifier, short mId) : Item(identifier, mId)
-    {
-        setMaxDamage(10);
-        setIconInfo("diamond", 0);
+std::vector<std::string> pathedNameToTokens(std::string pathedName) {
+    std::vector<std::string> tokens;
+    size_t start = 0, pos;
+
+    while ((pos = pathedName.find('\\', start)) != std::string::npos) {
+        tokens.push_back(pathedName.substr(start, pos - start));
+        start = pos + 1;
     }
 
-    virtual void appendFormattedHovertext(ItemStackBase const& isb, Level& level, std::string& text, bool b) const override {
-        Item::appendFormattedHovertext(isb, level, text, b);
-        text += "\nHello from custom item";
+    tokens.push_back(pathedName.substr(start));
+    return tokens;
+}
+
+UIControl* getFromPath(UIControl* root, std::string pathedName) {
+    std::vector<std::string> path = pathedNameToTokens(pathedName);
+
+    UIControl* current = root;
+
+    for (size_t i = 0; i < path.size(); ++i) {
+        bool found = false;
+
+        for (auto& child : current->mChildren) {
+            if (child->mName != path[i]) continue;
+            current = child.get();
+            found = true;
+            break;
+        }
+
+        if (!found) return nullptr;
     }
 
-    virtual ItemStack& use(ItemStack& itemStack, Player& player) const override {
-        Log::Info("Use");
-        return Item::use(itemStack, player);
-    };
-};
-
-WeakPtr<TestItem> testItem;
-WeakPtr<BlockLegacy> testBlock;
-WeakPtr<BlockItem> testBlockItem;
-
-void RegisterItems(ItemRegistry* registry) {
-    ItemRegistryRef regRef = ItemRegistryManager::getItemRegistry();
-        
-    testItem = registry->registerItemShared<TestItem>("minecraft:test_item", ++registry->mMaxItemID);
-
-    testBlockItem = registry->registerItemShared<BlockItem>("minecraft:test_block", testBlock->getBlockItemId());
-    HashedString hashedBlockName("minecraft:test_block");
-
-    auto* ret = new BlockTypeRegistry::LookupByNameImplReturnType();
-    BlockTypeRegistry::_lookupByNameImpl(ret, hashedBlockName, 0, BlockTypeRegistry::DefaultBlockState);
+    return current;
 }
 
-void RegisterBlocks(BlockDefinitionGroup* blockDef) {
-    Material testMaterial;
-    testMaterial.mType = Dirt;
-    testMaterial.mNeverBuildable = false;
-    testMaterial.mAlwaysDestroyable = true;
-    testMaterial.mReplaceable = false;
-    testMaterial.mLiquid = false;
-    testMaterial.mTranslucency = 0.0f;
-    testMaterial.mBlocksMotion = true;
-    testMaterial.mBlocksPrecipitation = true;
-    testMaterial.mSolid = true;
-    testMaterial.mSuperHot = false;
+void exploreToggle(UIControl* self, int depth) {
+    TextComponent* component = self->getComponent<TextComponent>();
 
-    testBlock = BlockTypeRegistry::registerBlock<BlockLegacy>("minecraft:test_block", ++blockDef->mLastBlockId, testMaterial);
+    if (component) {
+        if (component->mLabel == "AMETHYST!") {
+            Log::Info("name: {}, text: '{}', path: '{}'", self->mName, component->mLabel, self->getPathedName());
+        }
+    }
+
+    for (auto& child : self->mChildren) {
+        exploreToggle(child.get(), depth + 1);
+    }
 }
 
-class FrameRenderObject;
-SafetyHookInline _renderLevel;
+void BeforeRenderUI(ScreenView* screenView, MinecraftUIRenderContext* ctx) {
+    UIControl* rootControl = screenView->visualTree->mRootControlName;
+    //exploreToggle(rootControl, 0);
 
-Vec3 vertexes[8] = {
-    Vec3(0.0f, 0.0f, 0.0f),
-    Vec3(1.0f, 0.0f, 0.0f),
-    Vec3(0.0f, 1.0f, 0.0f),
-    Vec3(1.0f, 1.0f, 0.0f),
-    Vec3(0.0f, 0.0f, 1.0f),
-    Vec3(1.0f, 0.0f, 1.0f),
-    Vec3(0.0f, 1.0f, 1.0f),
-    Vec3(1.0f, 1.0f, 1.0f),
-};
+    std::string text("");
 
-int tris[12][3] = {
-    { 2, 6, 3 },
-    { 3, 6, 7 },
-    { 0, 2, 1 },
-    { 2, 3, 1 },
-    { 1, 3, 7 },
-    { 1, 7, 5 },
-    { 0, 1, 5 },
-    { 4, 0, 5 },
-    { 4, 6, 2 },
-    { 2, 0, 4 },
-    { 5, 7, 4 },
-    { 7, 6, 4 }
-};
+    UIControl* slider = getFromPath(rootControl, "variables_button_mappings_and_controls\\safezone_screen_matrix\\inner_matrix\\safezone_screen_panel\\root_screen_panel\\stack_panel\\content_panel\\container\\settings_common.dialog_content\\content_area\\control\\scrolling_panel\\scroll_mouse\\scroll_view\\stack_panel\\background_and_viewport\\scrolling_view_port\\scrolling_content\\amethyst_section\\atlas_section\\atlas_slider\\option_generic_core\\two_line_layout\\settings_common.option_slider_control\\slider");
+    if (slider) {
+        SliderComponent* component = slider->getComponent<SliderComponent>();
+        text = fmt::format("slider: {}%", component->mPercentage * 100);
+    }
 
-#define PI       3.14159265358979323846
-
-//SafetyHookInline _getMeshForBlock;
-//
-//mce::Mesh* getMeshForBlock(BlockTessellator* self, Tessellator* tessellator, const Block* block) {
-//    blockTess = self;
-//    Log::Info("0x{:x}", FindOffsetOfPointer(ci, self, sizeof(ClientInstance)));
-//    return _getMeshForBlock.thiscall<mce::Mesh*>(self, tessellator, block);
-//}
-
-void* renderLevel(LevelRenderer* levelRenderer, ScreenContext* screenContext, FrameRenderObject* frameRenderObject) {
-    Tessellator* tes = &screenContext->tessellator;
-
-    HashedString hashedMaterialName("entity_static");
-    mce::MaterialPtr material(*mce::RenderMaterialGroup::switchable, hashedMaterialName);
-
-    BlockSource* region = ci->getRegion();
-    const Block block = region->getBlock(0, -57, 0);
-    BlockPos blockPos(0, -57, 0);
-
-    Vec3* cameraPos = &levelRenderer->mLevelRendererPlayer->cameraPos;
-
-    /*ci->mBlockTessellator->appendTessellatedBlock(tes, &block);
-
-    Vec3* cameraPos = &levelRenderer->mLevelRendererPlayer->cameraPos;
-    BlockPos blockPos(0, -57, 0);
-
-    Vec3 offset(blockPos.x - cameraPos->y - 0.5f, blockPos.y - cameraPos->z + 0.5f, blockPos.z - cameraPos->x - 0.5f);
-
-    mce::MeshData* meshData = &tes->mMeshData;
-
-    for (auto& pos : meshData->mPositions) {
-        pos = pos + offset;
-    }*/
-
-    tes->begin(mce::TriangleList, 1);
-
-    //ci->mBlockTessellator->tessellateInWorld(*tes, block, blockPos, 0, 0);
-
-    Vec3 inverseCamera(-cameraPos->y, -cameraPos->z, -cameraPos->x);
-    tes->addPostTransformOffset(inverseCamera);
-
-    tes->vertex(0.0f, -56.0f, 0.0f);
-    tes->vertex(1.0f, -56.0f, 0.0f);
-    tes->vertex(0.0f, -56.0f, 1.0f);
-    
-    tes->setPosTransformOffset(Vec3(0.0f, 0.0f, 0.0f));
-
-    Log::Info("mCount: {}", tes->mCount);
-
-    mce::Mesh* mesh = new mce::Mesh();
-    tes->end(mesh, 0, "Test Mesh", 0);
-    tes->clear();
-
-    mesh->renderMesh(screenContext, &material);
-    delete mesh;
-
-    //MeshHelpers::renderMeshImmediately(screenContext, tes, &material);
-    //tes->clear();
-
-    void* res = _renderLevel.call<void*>(levelRenderer, screenContext, frameRenderObject);
-    return res;
+    UIControl* label = getFromPath(rootControl, "variables_button_mappings_and_controls\\safezone_screen_matrix\\inner_matrix\\safezone_screen_panel\\root_screen_panel\\stack_panel\\content_panel\\container\\settings_common.dialog_content\\content_area\\control\\scrolling_panel\\scroll_mouse\\scroll_view\\stack_panel\\background_and_viewport\\scrolling_view_port\\scrolling_content\\amethyst_section\\atlas_section\\test_label");
+    if (label) {
+        TextComponent* component = label->getComponent<TextComponent>();
+        component->setText(text);
+    }
 }
 
-void OnStartJoinGame(ClientInstance* _ci) {
-    ci = _ci;
+SafetyHookInline _setChecked;
+
+int64_t setChecked(ToggleComponent* self, int64_t a2, int64_t a3) {
+    Log::Info("0x{:x}, {} {}", reinterpret_cast<uintptr_t>(self->vtable) - GetMinecraftBaseAddress(), a2, a3);
+    return _setChecked.call<int64_t>(self, a2, a3);
 }
- 
-ModFunction void Initialize(HookManager* hookManager, Amethyst::EventManager* eventManager, InputManager* inputManager) 
+
+ModFunction void Initialize(AmethystContext* _amethyst)
 {
-    InitializeVtablePtrs();
+    amethyst = _amethyst;
+    amethyst->mEventManager.beforeRenderUI.AddListener(&BeforeRenderUI); 
 
-    eventManager->onStartJoinGame.AddListener(&OnStartJoinGame);
-
-    hookManager->CreateHookAbsolute(
-        _renderLevel,
-        SigScan("48 89 5C 24 ? 48 89 74 24 ? 55 57 41 56 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 49 8B F0 48 8B DA 4C 8B F1"),
-        &renderLevel
-    );
-
-    /*hookManager->RegisterFunction(&BlockTessellator::getMeshForBlock, "48 89 5C 24 ? 55 56 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4D 8B D8");
-    hookManager->CreateHook(&BlockTessellator::getMeshForBlock, _getMeshForBlock, &getMeshForBlock);*/
-
-    /*eventManager->registerItems.AddListener(&RegisterItems);
-    eventManager->registerBlocks.AddListener(&RegisterBlocks);*/
+    /*amethyst->mHookManager.RegisterFunction<&ToggleComponent::setChecked>("40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 48 8B D9 F3 0F 11 4C 24 ? 48 8B 49");
+    amethyst->mHookManager.CreateHook<&ToggleComponent::setChecked>(_setChecked, &setChecked);*/
 }
+
+// screen_controls_and_settings\variables_button_mappings_and_controls\safezone_screen_matrix\inner_matrix\safezone_screen_panel\root_screen_panel\stack_panel\content_panel\container\settings_common.dialog_content\content_area\control\scrolling_panel\scroll_mouse\scroll_view\stack_panel\background_and_viewport\scrolling_view_port\scrolling_content\amethyst_section\atlas_section\atlas_slider\option_generic_core\two_line_layout\settings_common.option_slider_control\slider
