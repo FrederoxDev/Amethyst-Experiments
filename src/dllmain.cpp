@@ -84,9 +84,6 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 {
     amethyst = _amethyst;
     amethyst->mEventManager.beforeRenderUI.AddListener(&BeforeRenderUI); 
-
-    /*amethyst->mHookManager.RegisterFunction<&ToggleComponent::setChecked>("40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 48 8B D9 F3 0F 11 4C 24 ? 48 8B 49");
-    amethyst->mHookManager.CreateHook<&ToggleComponent::setChecked>(_setChecked, &setChecked);*/
 }
 
 // screen_controls_and_settings\variables_button_mappings_and_controls\safezone_screen_matrix\inner_matrix\safezone_screen_panel\root_screen_panel\stack_panel\content_panel\container\settings_common.dialog_content\content_area\control\scrolling_panel\scroll_mouse\scroll_view\stack_panel\background_and_viewport\scrolling_view_port\scrolling_content\amethyst_section\atlas_section\atlas_slider\option_generic_core\two_line_layout\settings_common.option_slider_control\slider
