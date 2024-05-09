@@ -9,3 +9,4 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 }
 
 void RegisterItems(ItemRegistry* registry);
+void RegisterBlocks(BlockDefinitionGroup* blockDefinitions);
