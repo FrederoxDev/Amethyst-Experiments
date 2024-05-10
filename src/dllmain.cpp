@@ -4,10 +4,22 @@
 #include <amethyst/MinecraftVtables.hpp>
 #include <minecraft/src/common/world/item/BlockItem.hpp>
 
-AmethystContext* amethyst;
+class TestBlockClass : public BlockLegacy {
+public:
+	virtual const AABB& getVisualShape(const Block& block, AABB& aabb) const override {
+		return AABB(0.0, 0.0, 0.0, 10.0, 10.0, 1.0); 
+	}
 
+public:
+	TestBlockClass(const std::string& nameId, short id, const Material& material) 
+		: BlockLegacy(nameId, id, material) {
+	
+	}
+};
+
+AmethystContext* amethyst;
 WeakPtr<BlockItem> testBlockItem;
-WeakPtr<BlockLegacy> testBlock;
+WeakPtr<TestBlockClass> testBlock;
 
 ModFunction void Initialize(AmethystContext* _amethyst)
 {
@@ -20,24 +32,14 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 
 void RegisterItems(ItemRegistry* registry) 
 {
-	Log::Info("Register Items");
-
 	testBlockItem = registry->registerItemShared<BlockItem>("minecraft:test_block", testBlock->getBlockItemId());
-
-	HashedString hashedName("minecraft:test_block");
-	auto lookupResult = BlockTypeRegistry::_lookupByNameImpl(hashedName, 0, BlockTypeRegistry::BlockLegacyResolve);
-
-	Log::Info("looked up id: {}", lookupResult.blockLegacy->mID);
 }
 
 void RegisterBlocks(BlockDefinitionGroup* blockDefinitions) {
-	Log::Info("RegisterBlocks");
-
 	Material testMaterial;
 	testMaterial.mType = Dirt;
 	testMaterial.mNeverBuildable = false;
 	testMaterial.mAlwaysDestroyable = true;
-	testMaterial.mReplaceable = false;
 	testMaterial.mLiquid = false;
 	testMaterial.mTranslucency = 0.0f;
 	testMaterial.mBlocksMotion = true;
@@ -45,6 +47,6 @@ void RegisterBlocks(BlockDefinitionGroup* blockDefinitions) {
 	testMaterial.mSolid = true;
 	testMaterial.mSuperHot = false;
 
-	testBlock = BlockTypeRegistry::registerBlock<BlockLegacy>("minecraft:test_block", ++blockDefinitions->mLastBlockId, testMaterial);
-	Log::Info("testBlock id: {}", testBlock->mID);
+	testBlock = BlockTypeRegistry::registerBlock<TestBlockClass>("minecraft:test_block", ++blockDefinitions->mLastBlockId, testMaterial);
+	testBlock->setDestroyTime(1.5, 6.0);
 }
