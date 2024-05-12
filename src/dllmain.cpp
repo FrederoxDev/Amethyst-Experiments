@@ -5,20 +5,70 @@
 #include <minecraft/src/common/world/item/BlockItem.hpp>
 #include <minecraft/src-client/common/client/renderer/block/BlockGraphics.hpp>
 
+static AmethystContext* amethyst;
+static bool isClient = false;
+
 class TestBlockClass : public BlockLegacy {
 public:
 	TestBlockClass(const std::string& nameId, short id, const Material& material) 
-		: BlockLegacy(nameId, id, material) {
-	
+		: BlockLegacy(nameId, id, material) {}
+
+protected:
+	virtual void onPlace(BlockSource& region, const BlockPos& pos) const override
+	{
+		const Block& block = region.getBlock(pos.below());
+
+		Log::Info("TestBlockClass::onPlace");
 	}
 };
 
-AmethystContext* amethyst;
+class DebugStickItem : public Item {
+public:
+	DebugStickItem(const std::string& identifier, short numericalId) 
+		: Item(identifier, numericalId) {}
+
+public:
+	virtual bool isGlint(const ItemStackBase& stack) const override {
+		return true;
+	}
+
+private:
+	virtual InteractionResult _useOn(ItemStack& instance, Actor& entity, BlockPos pos, unsigned char face, const Vec3& clickPos) const override {
+		InteractionResult result;
+
+		result.mResult = 3;
+
+		BlockSource* region = amethyst->mClientInstance->getRegion();
+		const Block& block = region->getBlock(pos);
+
+		isClient = !isClient;
+		if (isClient) return result;
+
+		for (auto& state : block.mLegacyBlock->mStates)
+		{
+			int value = block.getState<int>(*state.second.mState);
+			Log::Info("state: {}, value: {:d}, max_value: {:d}", state.second.mState->mName.c_str(), value, state.second.mVariationCount);
+
+			if ((uint64_t)value + 1 >= (uint64_t)state.second.mVariationCount) value = 0;
+			else value++;
+
+			auto result = block.setState<int>(*state.second.mState, value);
+			region->setBlock(pos, *result, 2, nullptr, &entity);
+
+			Log::Info("changed to: {}", value);
+		}
+
+		return result;
+	}
+};
+
 WeakPtr<BlockItem> testBlockItem;
+WeakPtr<DebugStickItem> debugStickItem;
 WeakPtr<TestBlockClass> testBlock;
  
 SafetyHookInline _initBlocks;
 std::string blockIdentifier = "minecraft:test_block";
+std::string blockItemIdentifier = "test_block";
 
 void initBlocks(BlockGraphics* a1) {
 	Log::Info("initBlocks");
@@ -31,10 +81,8 @@ void initBlocks(BlockGraphics* a1) {
 		return;
 	}
 
-	// if there are no things in the textureItems vector add missing_tile
 	if (graphics->mTextureItems.size() == 0) {
-		Log::Info("Textures were not found, defaulting to missing_tile texture!");
-		graphics->setTextureItem("missing_tile", "missing_tile", "missing_tile", "missing_tile", "missing_tile", "missing_tile");
+		graphics->setTextureItem("diamond_block", "diamond_block", "diamond_block", "diamond_block", "diamond_block", "diamond_block");
 	}
 
 	graphics->setDefaultCarriedTextures();
@@ -53,7 +101,9 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 
 void RegisterItems(ItemRegistry* registry) 
 {
-	testBlockItem = registry->registerItemShared<BlockItem>(blockIdentifier, testBlock->getBlockItemId());
+	testBlockItem = registry->registerItemShared<BlockItem>(blockItemIdentifier, testBlock->getBlockItemId());
+	debugStickItem = registry->registerItemShared<DebugStickItem>("debug_stick", ++registry->mMaxItemID);
+	debugStickItem->setIconInfo("stick", 0);
 }
 
 void RegisterBlocks(BlockDefinitionGroup* blockDefinitions) {
@@ -68,6 +118,9 @@ void RegisterBlocks(BlockDefinitionGroup* blockDefinitions) {
 	testMaterial.mSolid = true;
 	testMaterial.mSuperHot = false;
 
+	BlockState* weirdoDirectionBlockState = (BlockState*)SlideAddress(0x5875420);
+
 	testBlock = BlockTypeRegistry::registerBlock<TestBlockClass>(blockIdentifier, ++blockDefinitions->mLastBlockId, testMaterial);
 	testBlock->setDestroyTime(1.5, 6.0);
+	testBlock->addState(*weirdoDirectionBlockState);
 }
