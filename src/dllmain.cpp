@@ -4,6 +4,7 @@
 #include <amethyst/MinecraftVtables.hpp>
 #include <minecraft/src/common/world/item/BlockItem.hpp>
 #include <minecraft/src-client/common/client/renderer/block/BlockGraphics.hpp>
+#include <minecraft/src/common/world/events/gameEvents/GameEvent.hpp>
 
 static AmethystContext* amethyst;
 static bool isClient = false;
@@ -35,14 +36,14 @@ public:
 private:
 	virtual InteractionResult _useOn(ItemStack& instance, Actor& entity, BlockPos pos, unsigned char face, const Vec3& clickPos) const override {
 		InteractionResult result;
-
 		result.mResult = 3;
 
-		BlockSource* region = amethyst->mClientInstance->getRegion();
-		const Block& block = region->getBlock(pos);
+		const Dimension& dimension = entity.getDimensionConst();
+		BlockSource& region = dimension.getBlockSourceFromMainChunkSource();
 
-		isClient = !isClient;
-		if (isClient) return result;
+		Log::Info("region ptr: 0x{:x}", std::bit_cast<uintptr_t>(&region));
+
+		const Block& block = region.getBlock(pos);
 
 		for (auto& state : block.mLegacyBlock->mStates)
 		{
@@ -53,10 +54,13 @@ private:
 			else value++;
 
 			auto result = block.setState<int>(*state.second.mState, value);
-			region->setBlock(pos, *result, 2, nullptr, &entity);
+			region.setBlock(pos, *result, 3, nullptr, nullptr);
 
 			Log::Info("changed to: {}", value);
 		}
+
+		GameEvent* blockChangeEvent = (GameEvent*)SlideAddress(0x5665208);
+		region.postGameEvent(&entity, *blockChangeEvent, pos, &block);
 
 		return result;
 	}
