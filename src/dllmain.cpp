@@ -9,17 +9,34 @@
 static AmethystContext* amethyst;
 static bool isClient = false;
 
+class TestBlockActor : public BlockActor {
+public:
+	TestBlockActor(BlockActorType type, const BlockPos& pos, const std::string& id)
+		: BlockActor(type, pos, id) {
+		mRendererId = BlockActorRendererId::TR_BANNER_RENDERER;
+	};
+
+	virtual void onPlace(BlockSource& a2) override {
+		Log::Info("TestBlockActor::onPlace");
+	}
+};
+
 class TestBlockClass : public BlockLegacy {
 public:
 	TestBlockClass(const std::string& nameId, short id, const Material& material) 
-		: BlockLegacy(nameId, id, material) {}
+		: BlockLegacy(nameId, id, material) 
+	{
+		mBlockEntityType = (BlockActorType)58;
+	}
+
+	virtual std::shared_ptr<BlockActor> newBlockEntity(const BlockPos& pos, const Block& block) const override {
+		return std::make_shared<TestBlockActor>((BlockActorType)58, pos, "bosh");
+	}
 
 protected:
 	virtual void onPlace(BlockSource& region, const BlockPos& pos) const override
 	{
 		const Block& block = region.getBlock(pos.below());
-
-		Log::Info("TestBlockClass::onPlace");
 	}
 };
 
@@ -40,8 +57,6 @@ private:
 
 		const Dimension& dimension = entity.getDimensionConst();
 		BlockSource& region = dimension.getBlockSourceFromMainChunkSource();
-
-		Log::Info("region ptr: 0x{:x}", std::bit_cast<uintptr_t>(&region));
 
 		const Block& block = region.getBlock(pos);
 
