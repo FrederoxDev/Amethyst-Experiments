@@ -5,15 +5,40 @@
 #include <minecraft/src/common/world/item/BlockItem.hpp>
 #include <minecraft/src-client/common/client/renderer/block/BlockGraphics.hpp>
 #include <minecraft/src/common/world/events/gameEvents/GameEvent.hpp>
+#include <minecraft/src-client/common/client/renderer/blockActor/BlockActorRenderer.hpp>
+#include <minecraft/src-client/common/client/renderer/blockActor/BlockActorRendererDispatcher.hpp>
+#include <minecraft/src-client/common/client/renderer/helpers/MeshHelpers.hpp>
 
 static AmethystContext* amethyst;
 static bool isClient = false;
+
+class TestBlockActorRenderer : public BlockActorRenderer {
+public:
+	virtual void render(BaseActorRenderContext& ctx, BlockActorRenderData& data) {
+		Tessellator& tess = ctx.mScreenContext->tessellator;
+
+		tess.begin(mce::PrimitiveMode::TriangleList, 3);
+		tess.addPostTransformOffset(data.position);
+
+		tess.vertex(Vec3(0.0, 0.0, 0.0));
+		tess.vertex(Vec3(0.0, 1.0, 0.0));
+		tess.vertex(Vec3(1.0, 0.0, 0.0));
+
+		mce::MaterialPtr* material = reinterpret_cast<mce::MaterialPtr*>(SlideAddress(0x5853DB0));
+		MeshHelpers::renderMeshImmediately(ctx.mScreenContext, &tess, material);
+		tess.addPostTransformOffset(-data.position.x, -data.position.y, -data.position.z);
+	}
+
+	TestBlockActorRenderer() : BlockActorRenderer() {
+		
+	}
+};
 
 class TestBlockActor : public BlockActor {
 public:
 	TestBlockActor(BlockActorType type, const BlockPos& pos, const std::string& id)
 		: BlockActor(type, pos, id) {
-		mRendererId = BlockActorRendererId::TR_BANNER_RENDERER;
+		mRendererId = (BlockActorRendererId)26;
 	};
 
 	virtual void onPlace(BlockSource& a2) override {
@@ -89,6 +114,23 @@ SafetyHookInline _initBlocks;
 std::string blockIdentifier = "minecraft:test_block";
 std::string blockItemIdentifier = "test_block";
 
+SafetyHookInline _initializeBlockEntityRenderers;
+
+void initializeBlockEntityRenderers(
+	BlockActorRenderDispatcher* self, void* a2, void* a3, void* a4, void* a5, 
+	void* a6, void* a7, void* a8, void* a9
+){
+	_initializeBlockEntityRenderers.call<void>(self, a2, a3, a4, a5, a6, a7, a8, a9);
+	Log::Info("initializeBlockEntityRenderers, count: {}", self->mRenderers.size());
+
+	self->mRenderers[(BlockActorRendererId)26] = std::make_unique<TestBlockActorRenderer>();
+
+	for (auto& renderer : self->mRenderers) {
+		Log::Info("{:d}", (uint64_t)renderer.first);
+	}
+
+}
+
 void initBlocks(BlockGraphics* a1) {
 	Log::Info("initBlocks");
 	_initBlocks.call(a1);
@@ -112,10 +154,15 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 	amethyst = _amethyst;
 	InitializeVtablePtrs();
 
+	new TestBlockActorRenderer();
+
 	amethyst->mEventManager.registerItems.AddListener(&RegisterItems);
 	amethyst->mEventManager.registerBlocks.AddListener(&RegisterBlocks);
 	amethyst->mHookManager.RegisterFunction<&BlockGraphics::initBlocks>("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 48 8B D9 45 33 E4 E8");
 	amethyst->mHookManager.CreateHook<&BlockGraphics::initBlocks>(_initBlocks, &initBlocks);
+
+	amethyst->mHookManager.RegisterFunction<&BlockActorRenderDispatcher::initializeBlockEntityRenderers>("40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4D 8B F9 49 8B F8 48 89 55");
+	amethyst->mHookManager.CreateHook<&BlockActorRenderDispatcher::initializeBlockEntityRenderers>(_initializeBlockEntityRenderers, &initializeBlockEntityRenderers);
 }
 
 void RegisterItems(ItemRegistry* registry) 
