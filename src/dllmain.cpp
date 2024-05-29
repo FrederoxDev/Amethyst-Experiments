@@ -8,42 +8,32 @@
 #include <minecraft/src-client/common/client/renderer/blockActor/BlockActorRenderer.hpp>
 #include <minecraft/src-client/common/client/renderer/blockActor/BlockActorRendererDispatcher.hpp>
 #include <minecraft/src-client/common/client/renderer/helpers/MeshHelpers.hpp>
+#include <minecraft/src-deps/minecraftrenderer/renderer/MaterialPtr.hpp>
+#include <minecraft/src-client/common/client/world/item/ItemIconManager.hpp>
 
 static AmethystContext* amethyst;
-static bool isClient = false;
-
-class TestBlockActorRenderer : public BlockActorRenderer {
-public:
-	virtual void render(BaseActorRenderContext& ctx, BlockActorRenderData& data) {
-		Tessellator& tess = ctx.mScreenContext->tessellator;
-
-		tess.begin(mce::PrimitiveMode::TriangleList, 3);
-		tess.addPostTransformOffset(data.position);
-
-		tess.vertex(Vec3(0.0, 0.0, 0.0));
-		tess.vertex(Vec3(0.0, 1.0, 0.0));
-		tess.vertex(Vec3(1.0, 0.0, 0.0));
-
-		mce::MaterialPtr* material = reinterpret_cast<mce::MaterialPtr*>(SlideAddress(0x5853DB0));
-		MeshHelpers::renderMeshImmediately(ctx.mScreenContext, &tess, material);
-		tess.addPostTransformOffset(-data.position.x, -data.position.y, -data.position.z);
-	}
-
-	TestBlockActorRenderer() : BlockActorRenderer() {
-		
-	}
-};
 
 class TestBlockActor : public BlockActor {
 public:
+	ItemStackBase mHeldItem;
+
 	TestBlockActor(BlockActorType type, const BlockPos& pos, const std::string& id)
 		: BlockActor(type, pos, id) {
 		mRendererId = (BlockActorRendererId)26;
 	};
 
-	virtual void onPlace(BlockSource& a2) override {
-		Log::Info("TestBlockActor::onPlace");
+	void SetStoredItem(const ItemStackBase& itemStack) {
+		mHeldItem = itemStack;
 	}
+};
+
+class TestBlockActorRenderer : public BlockActorRenderer {
+public:
+	virtual void render(BaseActorRenderContext& ctx, BlockActorRenderData& data) {
+
+	}
+	 
+	TestBlockActorRenderer() : BlockActorRenderer() {}
 };
 
 class TestBlockClass : public BlockLegacy {
@@ -58,10 +48,37 @@ public:
 		return std::make_shared<TestBlockActor>((BlockActorType)58, pos, "bosh");
 	}
 
+	virtual void addAABBs(const Block&, const IConstBlockSource&, const BlockPos&, const AABB*, std::vector<AABB>&) const override {
+		Log::Info("addAABBs");
+	}
+
 protected:
 	virtual void onPlace(BlockSource& region, const BlockPos& pos) const override
 	{
 		const Block& block = region.getBlock(pos.below());
+	}
+
+	virtual bool use(Player& player, const BlockPos& pos, unsigned char face, std::optional<Vec3> s) const override {
+		const Dimension& dimension = player.getDimensionConst();
+		BlockSource& region = dimension.getBlockSourceFromMainChunkSource();
+
+		TestBlockActor* blockActor = (TestBlockActor*)region.getBlockEntity(pos);
+		if (blockActor == nullptr) {
+			Log::Info("Failed to get block actor!");
+			return false;
+		}
+
+		Inventory* inventory = player.playerInventory->mInventory.get();
+		const ItemStack* itemStack = inventory->getItem(player.playerInventory->mSelected);
+
+		if (itemStack == nullptr || itemStack->mItem == nullptr) {
+			Log::Info("itemStack or itemStack->mItem was nullptr");
+			return false;
+		}
+
+		blockActor->SetStoredItem(*itemStack);
+
+		return true;
 	}
 };
 
@@ -105,14 +122,13 @@ private:
 		return result;
 	}
 };
-
-WeakPtr<BlockItem> testBlockItem;
-WeakPtr<DebugStickItem> debugStickItem;
-WeakPtr<TestBlockClass> testBlock;
  
 SafetyHookInline _initBlocks;
 std::string blockIdentifier = "minecraft:test_block";
 std::string blockItemIdentifier = "test_block";
+WeakPtr<BlockItem> testBlockItem;
+WeakPtr<DebugStickItem> debugStickItem;
+WeakPtr<TestBlockClass> testBlock;
 
 SafetyHookInline _initializeBlockEntityRenderers;
 
@@ -121,14 +137,7 @@ void initializeBlockEntityRenderers(
 	void* a6, void* a7, void* a8, void* a9
 ){
 	_initializeBlockEntityRenderers.call<void>(self, a2, a3, a4, a5, a6, a7, a8, a9);
-	Log::Info("initializeBlockEntityRenderers, count: {}", self->mRenderers.size());
-
 	self->mRenderers[(BlockActorRendererId)26] = std::make_unique<TestBlockActorRenderer>();
-
-	for (auto& renderer : self->mRenderers) {
-		Log::Info("{:d}", (uint64_t)renderer.first);
-	}
-
 }
 
 void initBlocks(BlockGraphics* a1) {
