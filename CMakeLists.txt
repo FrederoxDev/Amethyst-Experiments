@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.12)
 project(Amethyst-Experiments CXX ASM_NASM)
 set(MOD_VERSION "1.0.0")
 
-# Amethyst Minecraft Folder
-set(AmethystFolder "$ENV{localappdata}/Packages/Microsoft.MinecraftUWP_8wekyb3d8bbwe/AC/Amethyst/")
+# Amethyst Minecraft Folder 
+set(AmethystFolder "$ENV{localappdata}/Packages/Microsoft.MinecraftUWP_8wekyb3d8bbwe/LocalState/games/com.mojang/amethyst/")
 
 # Configure to build within the Amethyst Folder
 configure_file(mod.json.in "${AmethystFolder}/mods/${PROJECT_NAME}@${MOD_VERSION}/mod.json" @ONLY)
@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 23)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo" CACHE STRING "Build configurations" FORCE)
 set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build, options are: RelWithDebInfo" FORCE)
-
+ 
 # Make the Mod
 file(GLOB_RECURSE ${PROJECT_NAME}_All
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -22,7 +22,7 @@ file(GLOB_RECURSE ${PROJECT_NAME}_All
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.asm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
-) 
+)  
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_All})
 
