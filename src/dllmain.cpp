@@ -5,6 +5,10 @@
 #include <minecraft/src/common/world/level/dimension/DimensionHeightRange.hpp>
 #include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/OverworldDimension.hpp>
 #include <minecraft/src/common/world/level/chunk/ChunkSource.hpp>
+#include <minecraft/src/common/world/actor/Actor.hpp>
+#include <minecraft/src/common/nbt/CompoundTag.hpp>
+#include <minecraft/src/common/server/ServerPlayer.hpp>
+#include <minecraft/src/common/world/level/DimensionManager.hpp>
 #include <memory>
 
 AmethystContext* amethyst;
@@ -30,8 +34,11 @@ public:
 
     /**@vIndex {2} */
     virtual DimensionType getDimensionId() const override {
-        Log::Info("getDimensionId");
-        return OverworldDimension::getDimensionId();
+        DimensionType baseType = OverworldDimension::getDimensionId();
+        Log::Info("base {}", baseType.runtimeID);
+
+        //Log::Info("getDimensionId mBlockSource: 0x{:x} 0x{:x}", (uintptr_t)mBlockSource.get(), (uintptr_t)this->weak_from_this().lock().get());
+        return DimensionType::AutomaticID(0);
     }
 
     /**@vIndex {3} */
@@ -267,6 +274,47 @@ OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
 	return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
 }
 
+SafetyHookInline __loadNewPlayer;
+
+struct LambdaFields {
+    Level* level;
+    ServerPlayer* actor;
+    CompoundTag** compound;
+};
+
+void _loadNewPlayer(LambdaFields* a1) { 
+    CompoundTag* compound = *a1->compound;
+    Actor* actor = a1->actor;
+
+    Log::Info("before {}", actor->hasDimension() ? "has dimension" : "no dimension?");
+
+    __loadNewPlayer.call(a1);
+
+    Log::Info("after {}", actor->hasDimension() ? "has dimension" : "no dimension?");
+
+    return;
+
+    // begin reimplementation
+
+    /*if (compound) {
+        Assert("loading branch not implemented");
+    }
+    else {
+        actor->mInitMethod = ActorInitializationMethod::SPAWNED;
+    }
+
+
+    if (!actor->hasDimension()) {
+        std::string_view dimensionKey = "DimensionId";
+        DimensionType dimensionId = DimensionType::Undefined;
+
+        if (compound && compound->contains(dimensionKey)) {
+            dimensionId = (DimensionType)compound->getInt(dimensionKey);
+            Log::Info("Compound contained DimensionId {:d}", (uint32_t)dimensionId);
+        }
+    }  */  
+}
+
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
 	//_registerDimensionTypes.call(factory, a, b, c);
 
@@ -277,6 +325,16 @@ void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* fac
 	Log::Info("registerDimensionTypes 0x{:x} 0x{:x} 0x{:x} 0x{:x}", (uintptr_t)factory, (uintptr_t)a, (uintptr_t)b, (uintptr_t)c);
 }
 
+SafetyHookInline _getOrCreateDimension;
+
+WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimension>* result, DimensionType dimType) {
+    Log::Info("getOrCreateDimension, creating dimType {:d}", dimType.runtimeID);
+    result = _getOrCreateDimension.call<WeakRef<Dimension>*>(self, result, dimType);
+
+    Log::Info("getOrCreateDimension result: 0x{:x}", (uint64_t)result->get());
+    return result;
+}
+
 ModFunction void Initialize(AmethystContext* _amethyst)
 {
 	InitializeVtablePtrs();
@@ -285,4 +343,8 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 	HookManager& hooks = amethyst->mHookManager;
 
 	hooks.CreateHookAbsolute(_registerDimensionTypes, SlideAddress(0x40818E0), &registerDimensionTypes);
+    hooks.CreateHookAbsolute(__loadNewPlayer, SlideAddress(0x174AFE0), &_loadNewPlayer);
+
+    hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
+    hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
 }
