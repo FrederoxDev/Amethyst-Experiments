@@ -9,6 +9,9 @@
 #include <minecraft/src/common/nbt/CompoundTag.hpp>
 #include <minecraft/src/common/server/ServerPlayer.hpp>
 #include <minecraft/src/common/world/level/DimensionManager.hpp>
+#include <minecraft/src/common/world/level/levelgen/WorldGenerator.hpp>
+#include <minecraft/src/common/world/level/levelgen/structure/StructureFeatureRegistry.hpp>
+#include <minecraft/src/common/world/level/ChunkPos.hpp>
 #include <memory>
 
 AmethystContext* amethyst;
@@ -16,8 +19,60 @@ AmethystContext* amethyst;
 class ILevel;
 class Scheduler;
 
-
 SafetyHookInline _registerDimensionTypes;
+
+class BiomeArea {};
+
+class TestGenerator : public WorldGenerator {
+public:
+    TestGenerator(Dimension& dimension) : WorldGenerator(dimension, std::make_unique<StructureFeatureRegistry>()) {
+        Log::Info("TestGenerator");
+    }
+
+    /**@vIndex {11} */
+    virtual void loadChunk(LevelChunk& lc, bool forceImmediateReplacementDataLoad) {
+        Assert("Unimplemented");
+    }
+
+    /**@vIndex {38} */
+    virtual void prepareHeights(class BlockVolume& box, class ChunkPos const& chunkPos, bool factorInBeardsAndShavers) {Assert("Unimplemented");}
+
+    /**@vIndex {39} */
+    virtual void prepareAndComputeHeights(class BlockVolume& box, class ChunkPos const& chunkPos, std::vector<short>& ZXheights, bool factorInBeardsAndShavers, int skipTopN) {Assert("Unimplemented");}
+
+    /**@vIndex {40} */
+    virtual class BiomeArea getBiomeArea(class BoundingBox const& area, uint32_t scale) const {Assert("Unimplemented");}
+
+    /**@vIndex {41} */
+    virtual class BiomeSource const& getBiomeSource() const {Assert("Unimplemented");}
+
+    /**@vIndex {42} */
+    virtual struct BlockVolumeDimensions getBlockVolumeDimensions() const {Assert("Unimplemented");}
+
+    /**@vIndex {43} */
+    virtual class BlockPos findSpawnPosition() const {Assert("Unimplemented");}
+
+    /**@vIndex {46} */
+    virtual void decorateWorldGenLoadChunk(
+        class Biome const& biome,
+        class LevelChunk& lc,
+        class BlockVolumeTarget& target,
+        class Random& random,
+        class ChunkPos const& pos) const 
+    {
+        Assert("Unimplemented");
+    }
+
+    /**@vIndex {47} */
+    virtual void decorateWorldGenPostProcess(
+        class Biome const& biome,
+        class LevelChunk& lc,
+        class BlockSource& source,
+        class Random& random) const 
+    {
+        Assert("Unimplemented");
+    }
+};
 
 class TestOverworldDimension : public OverworldDimension {
 public:
@@ -26,248 +81,9 @@ public:
 		Log::Info("TestOverworldDimension");
 	};
 
-    /**@vIndex {1} */
-    virtual bool isNaturalDimension() const override {
-        Log::Info("isNaturalDimension");
-        return OverworldDimension::isNaturalDimension();
+    virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
+        return std::make_unique<TestGenerator>(*this);
     }
-
-    /**@vIndex {2} */
-    virtual DimensionType getDimensionId() const override {
-        DimensionType baseType = OverworldDimension::getDimensionId();
-        Log::Info("base {}", baseType.runtimeID);
-
-        //Log::Info("getDimensionId mBlockSource: 0x{:x} 0x{:x}", (uintptr_t)mBlockSource.get(), (uintptr_t)this->weak_from_this().lock().get());
-        return DimensionType::AutomaticID(0);
-    }
-
-    /**@vIndex {3} */
-    virtual void sendPacketForPosition(const BlockPos& pos, const Packet& packet, const Player* player) override {
-        Log::Info("sendPacketForPosition");
-        return OverworldDimension::sendPacketForPosition(pos, packet, player);
-    }
-
-    /**@vIndex {4} */
-    virtual void flushLevelChunkGarbageCollector() override {
-        Log::Info("flushLevelChunkGarbageCollector");
-        return OverworldDimension::flushLevelChunkGarbageCollector();
-    }
-
-    /**@vIndex {5} */
-    virtual void initializeWithLevelStorageManager(class LevelStorageManager& manager) override {
-        Log::Info("initializeWithLevelStorageManager");
-        return OverworldDimension::initializeWithLevelStorageManager(manager);
-    }
-
-    /**@vIndex {6} */
-    virtual BiomeRegistry& getBiomeRegistry() override {
-        Log::Info("getBiomeRegistry");
-        return OverworldDimension::getBiomeRegistry();
-    }
-
-    /**@vIndex {7} */
-    virtual const BiomeRegistry& getBiomeRegistry() const override {
-        Log::Info("const getBiomeRegistry");
-        return OverworldDimension::getBiomeRegistry();
-    }
-
-    /**@vIndex {8} */
-    virtual Vec3 translatePosAcrossDimension(const Vec3& vec, DimensionType dimId) const override {
-        Log::Info("translatePosAcrossDimension");
-        return OverworldDimension::translatePosAcrossDimension(vec, dimId);
-	}
-
-    /**@vIndex {9} */
-    virtual void forEachPlayer(std::function<bool(class Player&)> callback) const override {
-        Log::Info("forEachPlayer");
-        return OverworldDimension::forEachPlayer(callback);
-	}
-
-    /**@vIndex {10} */
-    virtual Actor* fetchEntity(ActorUniqueID actorID, bool getRemoved) const override {
-        Log::Info("fetchEntity");
-        return OverworldDimension::fetchEntity(actorID, getRemoved);
-	}
-
-    /**@vIndex {11} */
-    virtual void init(const br::worldgen::StructureSetRegistry& reg) override {
-        Log::Info("init");
-        return OverworldDimension::init(reg);
-	}
-
-    /**@vIndex {12} */
-    virtual void tick() override {
-        Log::Info("tick");
-        return OverworldDimension::tick();
-	}
-
-    /**@vIndex {13} */
-    virtual void tickRedstone() override {
-        Log::Info("tickRedstone");
-        return OverworldDimension::tickRedstone();
-	}
-
-    /**@vIndex {14} */
-    /*virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry& reg) override {
-        Log::Info("createGenerator");
-        return OverworldDimension::createGenerator(reg);
-	}*/
-
-    /**@vIndex {15} */
-    virtual void upgradeLevelChunk(class ChunkSource& source, class LevelChunk& lc, class LevelChunk& generatedChunk) override {
-        Log::Info("upgradeLevelChunk");
-        return OverworldDimension::upgradeLevelChunk(source, lc, generatedChunk);
-	}
-
-    /**@vIndex {16} */
-    virtual void fixWallChunk(class ChunkSource& source, class LevelChunk& chunk) override {
-        Log::Info("fixWallChunk");
-        return OverworldDimension::fixWallChunk(source, chunk);
-	}
-
-    /**@vIndex {17} */
-    virtual bool levelChunkNeedsUpgrade(const LevelChunk& chunk) const override {
-        Log::Info("levelChunkNeedsUpgrade");
-        return OverworldDimension::levelChunkNeedsUpgrade(chunk);
-	}
-
-    /**@vIndex {18} */
-    virtual bool isValidSpawn(int x, int z) const override {
-        Log::Info("isValidSpawn");
-        return OverworldDimension::isValidSpawn(x, z);
-	}
-
-    /**@vIndex {19} */
-    virtual class mce::Color getBrightnessDependentFogColor(const mce::Color& baseColor, float brightness) const override {
-        Log::Info("getBrightnessDependentFogColor");
-        return OverworldDimension::getBrightnessDependentFogColor(baseColor, brightness);
-	}
-
-    /**@vIndex {20} */
-    virtual bool hasPrecipitationFog() const override {
-        Log::Info("hasPrecipitationFog");
-        return OverworldDimension::hasPrecipitationFog();
-	}
-
-    /**@vIndex {21} */
-    virtual short getCloudHeight() const override {
-        Log::Info("getCloudHeight");
-        return OverworldDimension::getCloudHeight();
-	}
-
-    /**@vIndex {22} */
-    virtual class HashedString getDefaultBiome() const override {
-        Log::Info("getDefaultBiome");
-        return OverworldDimension::getDefaultBiome();
-	}
-
-    /**@vIndex {23} */
-    virtual bool hasGround() const override {
-        Log::Info("hasGround");
-        return OverworldDimension::hasGround();
-	}
-
-    /**@vIndex {24} */
-    virtual bool showSky() const override {
-        Log::Info("showSky");
-        return OverworldDimension::showSky();
-	}
-
-    /**@vIndex {25} */
-    virtual class BlockPos getSpawnPos() const override {
-        Log::Info("getSpawnPos");
-        return OverworldDimension::getSpawnPos();
-	}
-
-    /**@vIndex {26} */
-    virtual int getSpawnYPosition() const override {
-        Log::Info("getSpawnYPosition");
-        return OverworldDimension::getSpawnYPosition();
-	}
-
-    /**@vIndex {27} */
-    virtual bool mayRespawnViaBed() const override {
-        Log::Info("mayRespawnViaBed");
-        return OverworldDimension::mayRespawnViaBed();
-	}
-
-    /**@vIndex {28} */
-    virtual bool isDay() const override {
-        Log::Info("isDay");
-        return OverworldDimension::isDay();
-	}
-
-    /**@vIndex {29} */
-    virtual float getTimeOfDay(int time, float a) const override {
-        Log::Info("getTimeOfDay");
-        return OverworldDimension::getTimeOfDay(time, a);
-	}
-
-    /**@vIndex {30} */
-    virtual float getSunIntensity(float a, const Vec3& viewVector, float minInfluenceAngle) const override {
-        Log::Info("getSunIntensity");
-        return OverworldDimension::getSunIntensity(a, viewVector, minInfluenceAngle);
-	}
-
-    /**@vIndex {31} */
-    virtual bool forceCheckAllNeighChunkSavedStat() const override {
-        Log::Info("forceCheckAllNeighChunkSavedStat");
-        return OverworldDimension::forceCheckAllNeighChunkSavedStat();
-	}
-
-    /**@vIndex {32} */
-    virtual void sendBroadcast(const Packet& packet, class Player* except) override {
-        Log::Info("sendBroadcast");
-        return OverworldDimension::sendBroadcast(packet, except);
-	}
-
-    /**@vIndex {33} */
-    virtual bool is2DPositionRelevantForPlayer(const BlockPos& position, class Player& player) const override {
-        Log::Info("is2DPositionRelevantForPlayer");
-        return OverworldDimension::is2DPositionRelevantForPlayer(position, player);
-	}
-
-    /**@vIndex {34} */
-    virtual bool isActorRelevantForPlayer(class Player& player, const Actor& actor) const override {
-        Log::Info("isActorRelevantForPlayer");
-        return OverworldDimension::isActorRelevantForPlayer(player, actor);
-	}
-
-    /**@vIndex {35} */
-    virtual class BaseLightTextureImageBuilder* getLightTextureImageBuilder() const override {
-        Log::Info("getLightTextureImageBuilder");
-        return OverworldDimension::getLightTextureImageBuilder();
-	}
-
-    /**@vIndex {36} */
-    virtual const DimensionBrightnessRamp& getBrightnessRamp() const override {
-        Log::Info("getBrightnessRamp");
-        return OverworldDimension::getBrightnessRamp();
-	}
-
-    /**@vIndex {37} */
-    virtual void startLeaveGame() override {
-        Log::Info("startLeaveGame");
-        return OverworldDimension::startLeaveGame();
-	}
-
-    /**@vIndex {38} */
-    /*virtual std::unique_ptr<class ChunkBuildOrderPolicyBase> _createChunkBuildOrderPolicy() override {
-        Log::Info("_createChunkBuildOrderPolicy");
-        return OverworldDimension::_createChunkBuildOrderPolicy();
-	}*/
-
-    /**@vIndex {39} */
-    virtual void _upgradeOldLimboEntity(class CompoundTag& tag, LimboEntitiesVersion vers) override {
-        Log::Info("_upgradeOldLimboEntity");
-        return OverworldDimension::_upgradeOldLimboEntity(tag, vers);
-	}
-
-    /**@vIndex {40} */
-    virtual std::unique_ptr<ChunkSource> _wrapStorageForVersionCompatibility(std::unique_ptr<ChunkSource> storageSource, StorageVersion levelVersion) override {
-        Log::Info("_wrapStorageForVersionCompatibility");
-        return OverworldDimension::_wrapStorageForVersionCompatibility(std::move(storageSource), levelVersion);
-	}
 };
 
 OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {

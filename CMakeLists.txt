@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 23)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo" CACHE STRING "Build configurations" FORCE)
 set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build, options are: RelWithDebInfo" FORCE)
- 
+  
 # Make the Mod
 file(GLOB_RECURSE ${PROJECT_NAME}_All
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
