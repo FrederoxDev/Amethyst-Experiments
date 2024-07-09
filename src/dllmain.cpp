@@ -13,7 +13,12 @@
 #include <minecraft/src/common/world/level/levelgen/WorldGenerator.hpp>
 #include <minecraft/src/common/world/level/levelgen/structure/StructureFeatureRegistry.hpp>
 #include <minecraft/src/common/world/level/ChunkPos.hpp>
+#include <minecraft/src/common/world/level/ILevel.hpp>
 #include <memory>
+#include <minecraft/src/common/world/phys/Vec2.hpp>
+#include <minecraft/src/common/dataloadhelper/DefaultDataLoadHelper.hpp>
+#include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
+#include <minecraft/src/common/network/ServerNetworkHandler.hpp>
 
 AmethystContext* amethyst;
 
@@ -102,42 +107,61 @@ OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
 SafetyHookInline __loadNewPlayer;
 
 struct LambdaFields {
-    Level* level;
-    ServerPlayer* actor;
+    ServerNetworkHandler* serverNetworkHandler;
+    ServerPlayer* player;
     CompoundTag** compound;
 };
 
 void _loadNewPlayer(LambdaFields* a1) { 
-    CompoundTag* compound = *a1->compound;
-    Actor* actor = a1->actor;
+    
+    ILevel& level = *a1->serverNetworkHandler->mLevel;
+    CompoundTag* actorData = *a1->compound;
+    ServerPlayer* player = a1->player;
+    DefaultDataLoadHelper dataLoadHelper = DefaultDataLoadHelper();
 
-    Log::Info("before {}", actor->hasDimension() ? "has dimension" : "no dimension?");
-
-    __loadNewPlayer.call(a1);
-
-    Log::Info("after {}", actor->hasDimension() ? "has dimension" : "no dimension?");
-
-    return;
-
-    // begin reimplementation
-
-    /*if (compound) {
-        Assert("loading branch not implemented");
+    if (actorData) {
+        player->mInitMethod = ActorInitializationMethod::LOADED;
+        player->load(*actorData, dataLoadHelper);
     }
     else {
-        actor->mInitMethod = ActorInitializationMethod::SPAWNED;
+        player->mInitMethod = ActorInitializationMethod::SPAWNED;
     }
 
+    // Try and load the dimension from NBT
+    if (!player->hasDimension()) {
+        DimensionType dimId = DimensionType(3); // VanillaDimensions::Undefined
 
-    if (!actor->hasDimension()) {
-        std::string_view dimensionKey = "DimensionId";
-        DimensionType dimensionId = DimensionType::Undefined;
-
-        if (compound && compound->contains(dimensionKey)) {
-            dimensionId = (DimensionType)compound->getInt(dimensionKey);
-            Log::Info("Compound contained DimensionId {:d}", (uint32_t)dimensionId);
+        // load from compoundTag
+        if (actorData && actorData->contains("DimensionId")) {
+            dimId = DimensionType(actorData->getInt("DimensionId"));
         }
-    }  */  
+
+        DimensionType fallbackId = level.getLastOrDefaultSpawnDimensionId(dimId);
+        WeakRef<Dimension> dimension = level.getOrCreateDimension(dimId);
+
+        if (!dimension) {
+            Assert("Failed to get or create dimension for loading player which had a serialzed dimension id {}", dimId.runtimeID);
+        }
+
+        player->setDimension(dimension);
+    }
+    
+    if (!player->hasDimension()) {
+        Assert("Could not get or create dimension when loading the player");
+    }
+
+    const Dimension& dimension = player->getDimensionConst();
+    const BlockPos& defaultSpawn = level.getDefaultSpawn();
+
+    // the defaultSpawn BlockPos seems to get validated before doing this, emitting for now..
+    // seems to be just a check for: bug 475722 (which is hidden to public)
+    player->moveTo(Vec3(defaultSpawn), Vec2(0.0, 0.0));
+    player->prepareRegion(*dimension.mChunkSource.get());
+
+    if (actorData) {
+        player->reload();
+        player->load(*actorData, dataLoadHelper);
+    }
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
@@ -154,6 +178,7 @@ SafetyHookInline _getOrCreateDimension;
 
 WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimension>* result, DimensionType dimType) {
     Log::Info("getOrCreateDimension, creating dimType {:d}", dimType.runtimeID);
+
     result = _getOrCreateDimension.call<WeakRef<Dimension>*>(self, result, dimType);
 
     Log::Info("getOrCreateDimension result: 0x{:x}", (uint64_t)result->get());
