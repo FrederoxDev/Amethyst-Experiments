@@ -5,6 +5,7 @@
 #include <minecraft/src/common/world/level/dimension/DimensionHeightRange.hpp>
 #include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/OverworldDimension.hpp>
 #include <minecraft/src/common/world/level/chunk/ChunkSource.hpp>
+#include <minecraft/src/common/world/level/chunk/LevelChunk.hpp>
 #include <minecraft/src/common/world/actor/Actor.hpp>
 #include <minecraft/src/common/nbt/CompoundTag.hpp>
 #include <minecraft/src/common/server/ServerPlayer.hpp>
@@ -31,7 +32,13 @@ public:
 
     /**@vIndex {11} */
     virtual void loadChunk(LevelChunk& lc, bool forceImmediateReplacementDataLoad) {
-        Assert("Unimplemented");
+        Log::Info("[loadChunk] mPosition: {}, loadState: {}, min: {}, max: {}", lc.mPosition, (int)lc.mLoadState, lc.mMin, lc.mMax);
+
+        lc.mLoadState = ChunkState::Generated;
+
+        if (lc.mGenerator == nullptr) {
+            lc.mGenerator = this;
+        }
     }
 
     /**@vIndex {38} */
@@ -50,7 +57,9 @@ public:
     virtual struct BlockVolumeDimensions getBlockVolumeDimensions() const {Assert("Unimplemented");}
 
     /**@vIndex {43} */
-    virtual class BlockPos findSpawnPosition() const {Assert("Unimplemented");}
+    virtual class BlockPos findSpawnPosition() const {
+        return BlockPos(0, 100, 0);
+    }
 
     /**@vIndex {46} */
     virtual void decorateWorldGenLoadChunk(
