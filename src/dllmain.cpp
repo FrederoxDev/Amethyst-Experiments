@@ -19,6 +19,8 @@
 #include <minecraft/src/common/dataloadhelper/DefaultDataLoadHelper.hpp>
 #include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
 #include <minecraft/src/common/network/ServerNetworkHandler.hpp>
+#include <minecraft/src/common/world/level/dimension/VanillaDimensions.hpp>
+#include <minecraft/src/common/network/packet/ChangeDimensionPacket.hpp>
 
 AmethystContext* amethyst;
 
@@ -37,7 +39,7 @@ public:
 
     /**@vIndex {11} */
     virtual void loadChunk(LevelChunk& lc, bool forceImmediateReplacementDataLoad) {
-        Log::Info("[loadChunk] mPosition: {}, loadState: {}, min: {}, max: {}", lc.mPosition, (int)lc.mLoadState, lc.mMin, lc.mMax);
+        //Log::Info("[loadChunk] mPosition: {}, loadState: {}, min: {}, max: {}", lc.mPosition, (int)lc.mLoadState, lc.mMin, lc.mMax);
 
         lc.mLoadState = ChunkState::Generated;
 
@@ -90,8 +92,8 @@ public:
 
 class TestOverworldDimension : public OverworldDimension {
 public:
-	TestOverworldDimension(ILevel& level, Scheduler& callbackContext) 
-	: OverworldDimension(level, callbackContext) {
+	TestOverworldDimension(ILevel& level, DimensionType dimId, DimensionHeightRange heightRange, Scheduler& callbackContext, std::string dimensionName)
+	: OverworldDimension(level, dimId, heightRange, callbackContext, dimensionName) {
 		Log::Info("TestOverworldDimension");
 	};
 
@@ -101,7 +103,12 @@ public:
 };
 
 OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
-	return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
+    DimensionType dimId(4);
+    DimensionHeightRange heightRange;
+    heightRange.mMin = 0;
+    heightRange.mMax = 255;
+
+	return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, dimId, heightRange, scheduler, "TestDimension"));
 }
 
 SafetyHookInline __loadNewPlayer;
@@ -113,7 +120,6 @@ struct LambdaFields {
 };
 
 void _loadNewPlayer(LambdaFields* a1) { 
-    
     ILevel& level = *a1->serverNetworkHandler->mLevel;
     CompoundTag* actorData = *a1->compound;
     ServerPlayer* player = a1->player;
@@ -129,14 +135,16 @@ void _loadNewPlayer(LambdaFields* a1) {
 
     // Try and load the dimension from NBT
     if (!player->hasDimension()) {
-        DimensionType dimId = DimensionType(3); // VanillaDimensions::Undefined
+        DimensionType dimId = VanillaDimensions::Undefined;
 
         // load from compoundTag
         if (actorData && actorData->contains("DimensionId")) {
             dimId = DimensionType(actorData->getInt("DimensionId"));
         }
 
-        DimensionType fallbackId = level.getLastOrDefaultSpawnDimensionId(dimId);
+        // Validate the dimension is not undefined
+        dimId = level.getLastOrDefaultSpawnDimensionId(dimId);
+        dimId = DimensionType::AutomaticID(0); // Force an ID for debugging, not apart of func.
         WeakRef<Dimension> dimension = level.getOrCreateDimension(dimId);
 
         if (!dimension) {
@@ -165,11 +173,10 @@ void _loadNewPlayer(LambdaFields* a1) {
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
-	//_registerDimensionTypes.call(factory, a, b, c);
-
 	// register a dimension with the overworld name because custom names don't seem to get created
 	// I suspect they are registered on demand when loading into the dimension.
-	factory->registerFactory("overworld", makeTestDimension);
+	_registerDimensionTypes.call(factory, a, b, c);
+	factory->registerFactory("TestDimension", makeTestDimension);
 
 	Log::Info("registerDimensionTypes 0x{:x} 0x{:x} 0x{:x} 0x{:x}", (uintptr_t)factory, (uintptr_t)a, (uintptr_t)b, (uintptr_t)c);
 }
@@ -185,6 +192,57 @@ WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimensi
     return result;
 }
 
+SafetyHookInline _VanillaDimensions_toString;
+
+std::string VanillaDimensions_toString(const DimensionType& dimId) {
+    
+    if (dimId.runtimeID == 0) return "overworld";
+    if (dimId.runtimeID == 1) return "nether";
+    if (dimId.runtimeID == 2) return "the end";
+    if (dimId.runtimeID == 3) return "undefined";
+    if (dimId.runtimeID == 4) return "TestDimension";
+
+    Assert("Unknown DimensionType: {}", dimId.runtimeID);
+}
+
+SafetyHookInline _VanillaDimensions_toSerializedInt;
+
+struct UnknownType {
+    std::byte padding0[40];
+    DimensionType dimId;
+};
+
+void serializeDimID(UnknownType& ukn, BinaryStream& stream) {
+    stream.write<short>(0);
+    stream.writeString("");
+    stream.writeUnsignedVarInt32(ukn.dimId.runtimeID * 2);
+}
+
+SafetyHookInline _VanillaDimensions_fromSerializedInt;
+
+Bedrock::Result<DimensionType> VanillaDimensions_fromSerializedInt(Bedrock::Result<int>&& serializedValue) {
+    DimensionType dimType = DimensionType(serializedValue.value());
+    return Bedrock::Result<DimensionType>(dimType);
+}
+
+SafetyHookInline _ChangeDimensionPacket_write;
+
+void ChangeDimensionPacket_write(ChangeDimensionPacket* self, BinaryStream& stream) {
+    Log::Info("ChangeDimensionPacket::write: {}", self->mDimensionId.runtimeID);
+
+    stream.writeUnsignedVarInt32(self->mDimensionId.runtimeID);
+    stream.write(self->mPos);
+    stream.write(self->mRespawn);
+}
+
+SafetyHookInline _MinecraftPackets_createPacket;
+
+std::shared_ptr<Packet> MinecraftPackets_createPacket(MinecraftPacketIds packetID) {
+    auto packet = _MinecraftPackets_createPacket.call<std::shared_ptr<Packet>>(packetID);
+    Log::Info("[MinecraftPackets::createPacket] {}", packet->getName());
+    return packet;
+}
+
 ModFunction void Initialize(AmethystContext* _amethyst)
 {
 	InitializeVtablePtrs();
@@ -197,4 +255,19 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 
     hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
     hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
+
+    hooks.RegisterFunction<&VanillaDimensions::toString>("40 53 48 83 EC ? 4C 63 02");
+    hooks.CreateHook<&VanillaDimensions::toString>(_VanillaDimensions_toString, &VanillaDimensions_toString);
+
+    hooks.RegisterFunction<&VanillaDimensions::toSerializedInt>("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B DA 48 8B F9 0F B7 11");
+    hooks.CreateHook<&VanillaDimensions::toSerializedInt>(_VanillaDimensions_toSerializedInt, &serializeDimID);
+
+    hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
+    hooks.CreateHook<&ChangeDimensionPacket::write>(_ChangeDimensionPacket_write, &ChangeDimensionPacket_write);
+
+    //hooks.RegisterFunction<&MinecraftPackets::createPacket>("40 53 48 83 EC ? 45 33 C0 48 8B D9 FF CA 81 FA");
+    //hooks.CreateHook<&MinecraftPackets::createPacket>(_MinecraftPackets_createPacket, &MinecraftPackets_createPacket);
+
+    hooks.RegisterFunction<&VanillaDimensions::fromSerializedInt>("48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B D9 48 8D 4D");
+    hooks.CreateHook<&VanillaDimensions::fromSerializedInt>(_VanillaDimensions_fromSerializedInt, &VanillaDimensions_fromSerializedInt);
 }
