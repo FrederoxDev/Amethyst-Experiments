@@ -1,8 +1,11 @@
 ﻿#include "dllmain.h"
 
-AmethystContext* amethyst;
+//AmethystContext& amethyst;
 
-ModFunction void Initialize(AmethystContext* _amethyst)
+ModFunction void Initialize(AmethystContext& amethyst)
 {
-	amethyst = _amethyst;
+	auto& featureFlags = amethyst.mFeatures;
+	featureFlags->enableInputSystem = true;
+
+	Log::Info("hello!");
 }
