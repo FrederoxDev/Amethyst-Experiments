@@ -21,8 +21,12 @@
 #include <minecraft/src/common/network/ServerNetworkHandler.hpp>
 #include <minecraft/src/common/world/level/dimension/VanillaDimensions.hpp>
 #include <minecraft/src/common/network/packet/ChangeDimensionPacket.hpp>
+#include <minecraft/src/common/world/level/dimension/DimensionBrightnessRamp.hpp>
+#include "F3Screen.hpp"
 
 AmethystContext* amethyst;
+static DimensionType testDimensionID = DimensionType(0);
+static std::string testDimensionName = "overworld";
 
 class ILevel;
 class Scheduler;
@@ -92,10 +96,17 @@ public:
 
 class TestOverworldDimension : public OverworldDimension {
 public:
-	TestOverworldDimension(ILevel& level, DimensionType dimId, DimensionHeightRange heightRange, Scheduler& callbackContext, std::string dimensionName)
-	: OverworldDimension(level, dimId, heightRange, callbackContext, dimensionName) {
-		Log::Info("TestOverworldDimension");
-	};
+	/*TestOverworldDimension(ILevel& level, DimensionType dimId, DimensionHeightRange heightRange, Scheduler& callbackContext, std::string dimensionName)
+	    : OverworldDimension(level, dimId, heightRange, callbackContext, dimensionName) 
+    {
+        mHasWeather = true;
+        mDefaultBrightness.sky = Brightness::MAX;
+        mSeaLevel = 63;
+        mDimensionBrightnessRamp = std::make_unique<DimensionBrightnessRamp>();
+        mDimensionBrightnessRamp->buildBrightnessRamp();
+	};*/
+
+    TestOverworldDimension(ILevel& level, Scheduler& callbackContext) : OverworldDimension(level, callbackContext) {}
 
     virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
         return std::make_unique<TestGenerator>(*this);
@@ -103,12 +114,12 @@ public:
 };
 
 OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
-    DimensionType dimId(4);
     DimensionHeightRange heightRange;
     heightRange.mMin = 0;
     heightRange.mMax = 255;
 
-	return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, dimId, heightRange, scheduler, "TestDimension"));
+    return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
+	//return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, testDimensionID, heightRange, scheduler, testDimensionName));
 }
 
 SafetyHookInline __loadNewPlayer;
@@ -144,7 +155,7 @@ void _loadNewPlayer(LambdaFields* a1) {
 
         // Validate the dimension is not undefined
         dimId = level.getLastOrDefaultSpawnDimensionId(dimId);
-        dimId = DimensionType::AutomaticID(0); // Force an ID for debugging, not apart of func.
+        dimId = testDimensionID; // Force an ID for debugging, not apart of func.
         WeakRef<Dimension> dimension = level.getOrCreateDimension(dimId);
 
         if (!dimension) {
@@ -173,10 +184,16 @@ void _loadNewPlayer(LambdaFields* a1) {
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
+    //VanillaDimensions::DimensionMap->clear();
+    /*VanillaDimensions::DimensionMap->emplace(VanillaDimensions::Overworld, "overworld");
+    VanillaDimensions::DimensionMap->emplace(VanillaDimensions::Nether, "nether");
+    VanillaDimensions::DimensionMap->emplace(VanillaDimensions::TheEnd, "the end");*/
+    //VanillaDimensions::DimensionMap->emplace(testDimensionID, testDimensionName);
+
 	// register a dimension with the overworld name because custom names don't seem to get created
 	// I suspect they are registered on demand when loading into the dimension.
-	_registerDimensionTypes.call(factory, a, b, c);
-	factory->registerFactory("TestDimension", makeTestDimension);
+	//_registerDimensionTypes.call(factory, a, b, c);
+	factory->registerFactory(testDimensionName, makeTestDimension);
 
 	Log::Info("registerDimensionTypes 0x{:x} 0x{:x} 0x{:x} 0x{:x}", (uintptr_t)factory, (uintptr_t)a, (uintptr_t)b, (uintptr_t)c);
 }
@@ -196,11 +213,11 @@ SafetyHookInline _VanillaDimensions_toString;
 
 std::string VanillaDimensions_toString(const DimensionType& dimId) {
     
+    //if (dimId.runtimeID == testDimensionID.runtimeID) return testDimensionName;
     if (dimId.runtimeID == 0) return "overworld";
     if (dimId.runtimeID == 1) return "nether";
     if (dimId.runtimeID == 2) return "the end";
     if (dimId.runtimeID == 3) return "undefined";
-    if (dimId.runtimeID == 4) return "TestDimension";
 
     Assert("Unknown DimensionType: {}", dimId.runtimeID);
 }
@@ -208,13 +225,16 @@ std::string VanillaDimensions_toString(const DimensionType& dimId) {
 SafetyHookInline _VanillaDimensions_toSerializedInt;
 
 struct UnknownType {
-    std::byte padding0[40];
+    short someShort;
+    std::string biome;
     DimensionType dimId;
 };
 
 void serializeDimID(UnknownType& ukn, BinaryStream& stream) {
+    Log::Info("{} {} {}", ukn.someShort, ukn.biome, ukn.dimId.runtimeID);
+
     stream.write<short>(0);
-    stream.writeString("");
+    stream.writeString("plains");
     stream.writeUnsignedVarInt32(ukn.dimId.runtimeID * 2);
 }
 
@@ -262,12 +282,18 @@ ModFunction void Initialize(AmethystContext* _amethyst)
     hooks.RegisterFunction<&VanillaDimensions::toSerializedInt>("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B DA 48 8B F9 0F B7 11");
     hooks.CreateHook<&VanillaDimensions::toSerializedInt>(_VanillaDimensions_toSerializedInt, &serializeDimID);
 
-    hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
-    hooks.CreateHook<&ChangeDimensionPacket::write>(_ChangeDimensionPacket_write, &ChangeDimensionPacket_write);
+    hooks.RegisterFunction<&VanillaDimensions::fromSerializedInt>("48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B D9 48 8D 4D");
+    hooks.CreateHook<&VanillaDimensions::fromSerializedInt>(_VanillaDimensions_fromSerializedInt, &VanillaDimensions_fromSerializedInt);
+
+
+    // Unused:
+
+    //hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
+    //hooks.CreateHook<&ChangeDimensionPacket::write>(_ChangeDimensionPacket_write, &ChangeDimensionPacket_write);
 
     //hooks.RegisterFunction<&MinecraftPackets::createPacket>("40 53 48 83 EC ? 45 33 C0 48 8B D9 FF CA 81 FA");
     //hooks.CreateHook<&MinecraftPackets::createPacket>(_MinecraftPackets_createPacket, &MinecraftPackets_createPacket);
 
-    hooks.RegisterFunction<&VanillaDimensions::fromSerializedInt>("48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B D9 48 8D 4D");
-    hooks.CreateHook<&VanillaDimensions::fromSerializedInt>(_VanillaDimensions_fromSerializedInt, &VanillaDimensions_fromSerializedInt);
+    auto& events = amethyst->mEventManager;
+    events.afterRenderUI.AddListener(&RenderF3);
 }
