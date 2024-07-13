@@ -96,17 +96,18 @@ public:
 
 class TestOverworldDimension : public OverworldDimension {
 public:
-	/*TestOverworldDimension(ILevel& level, DimensionType dimId, DimensionHeightRange heightRange, Scheduler& callbackContext, std::string dimensionName)
-	    : OverworldDimension(level, dimId, heightRange, callbackContext, dimensionName) 
+	TestOverworldDimension(ILevel& level, DimensionType dimId, DimensionHeightRange heightRange, Scheduler& callbackContext, std::string dimensionName)
+        : OverworldDimension(level, dimId, heightRange, callbackContext, testDimensionName)
     {
         mHasWeather = true;
         mDefaultBrightness.sky = Brightness::MAX;
         mSeaLevel = 63;
         mDimensionBrightnessRamp = std::make_unique<DimensionBrightnessRamp>();
         mDimensionBrightnessRamp->buildBrightnessRamp();
-	};*/
+        Log::Info("custom ctor");
+	};
 
-    TestOverworldDimension(ILevel& level, Scheduler& callbackContext) : OverworldDimension(level, callbackContext) {}
+    //TestOverworldDimension(ILevel& level, Scheduler& callbackContext) : OverworldDimension(level, callbackContext) {}
 
     virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
         return std::make_unique<TestGenerator>(*this);
@@ -118,8 +119,8 @@ OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
     heightRange.mMin = 0;
     heightRange.mMax = 255;
 
-    return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
-	//return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, testDimensionID, heightRange, scheduler, testDimensionName));
+    //return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
+    return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, testDimensionID, heightRange, scheduler, testDimensionName));
 }
 
 SafetyHookInline __loadNewPlayer;
@@ -184,16 +185,15 @@ void _loadNewPlayer(LambdaFields* a1) {
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
-    //VanillaDimensions::DimensionMap->clear();
-    /*VanillaDimensions::DimensionMap->emplace(VanillaDimensions::Overworld, "overworld");
-    VanillaDimensions::DimensionMap->emplace(VanillaDimensions::Nether, "nether");
-    VanillaDimensions::DimensionMap->emplace(VanillaDimensions::TheEnd, "the end");*/
-    //VanillaDimensions::DimensionMap->emplace(testDimensionID, testDimensionName);
+    VanillaDimensions::DimensionMap->clear();
+    VanillaDimensions::DimensionMap->emplace(testDimensionName, testDimensionID);
 
 	// register a dimension with the overworld name because custom names don't seem to get created
 	// I suspect they are registered on demand when loading into the dimension.
 	//_registerDimensionTypes.call(factory, a, b, c);
-	factory->registerFactory(testDimensionName, makeTestDimension);
+    factory->registerFactory(testDimensionName, makeTestDimension);
+
+    Log::Info("0x{:x}", (uintptr_t)&factory->mFactoryMap);
 
 	Log::Info("registerDimensionTypes 0x{:x} 0x{:x} 0x{:x} 0x{:x}", (uintptr_t)factory, (uintptr_t)a, (uintptr_t)b, (uintptr_t)c);
 }
@@ -213,7 +213,8 @@ SafetyHookInline _VanillaDimensions_toString;
 
 std::string VanillaDimensions_toString(const DimensionType& dimId) {
     
-    //if (dimId.runtimeID == testDimensionID.runtimeID) return testDimensionName;
+    if (dimId.runtimeID == testDimensionID.runtimeID) return testDimensionName;
+
     if (dimId.runtimeID == 0) return "overworld";
     if (dimId.runtimeID == 1) return "nether";
     if (dimId.runtimeID == 2) return "the end";
@@ -276,6 +277,8 @@ ModFunction void Initialize(AmethystContext* _amethyst)
     hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
     hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
 
+    // todo: hook fromString..
+
     hooks.RegisterFunction<&VanillaDimensions::toString>("40 53 48 83 EC ? 4C 63 02");
     hooks.CreateHook<&VanillaDimensions::toString>(_VanillaDimensions_toString, &VanillaDimensions_toString);
 
@@ -284,7 +287,6 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 
     hooks.RegisterFunction<&VanillaDimensions::fromSerializedInt>("48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B D9 48 8D 4D");
     hooks.CreateHook<&VanillaDimensions::fromSerializedInt>(_VanillaDimensions_fromSerializedInt, &VanillaDimensions_fromSerializedInt);
-
 
     // Unused:
 
