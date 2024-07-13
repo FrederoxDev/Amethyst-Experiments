@@ -269,7 +269,7 @@ ModFunction void Initialize(AmethystContext* _amethyst)
 	InitializeVtablePtrs();
 	amethyst = _amethyst;
 
-	HookManager& hooks = amethyst->mHookManager;
+	HookManager& hooks = *amethyst->mHookManager;
 
 	hooks.CreateHookAbsolute(_registerDimensionTypes, SlideAddress(0x40818E0), &registerDimensionTypes);
     hooks.CreateHookAbsolute(__loadNewPlayer, SlideAddress(0x174AFE0), &_loadNewPlayer);
@@ -296,6 +296,6 @@ ModFunction void Initialize(AmethystContext* _amethyst)
     //hooks.RegisterFunction<&MinecraftPackets::createPacket>("40 53 48 83 EC ? 45 33 C0 48 8B D9 FF CA 81 FA");
     //hooks.CreateHook<&MinecraftPackets::createPacket>(_MinecraftPackets_createPacket, &MinecraftPackets_createPacket);
 
-    auto& events = amethyst->mEventManager;
+    auto& events = *amethyst->mEventManager;
     events.afterRenderUI.AddListener(&RenderF3);
 }
