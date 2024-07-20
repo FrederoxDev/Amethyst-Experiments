@@ -1,32 +1,33 @@
 ﻿#include "dllmain.h"
+#include <memory>
 #include <minecraft/src/common/ActorUniqueID.hpp>
-#include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/VanillaDimensionFactory.hpp>
+#include <minecraft/src/common/world/phys/Vec2.hpp>
 #include <minecraft/src/common/world/level/dimension/Dimension.hpp>
 #include <minecraft/src/common/world/level/dimension/DimensionHeightRange.hpp>
-#include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/OverworldDimension.hpp>
+#include <minecraft/src/common/world/level/dimension/VanillaDimensions.hpp>
 #include <minecraft/src/common/world/level/chunk/ChunkSource.hpp>
 #include <minecraft/src/common/world/level/chunk/LevelChunk.hpp>
+#include <minecraft/src/common/world/level/DimensionManager.hpp>
+#include <minecraft/src/common/world/level/levelgen/WorldGenerator.hpp>
+#include <minecraft/src/common/world/level/ChunkPos.hpp>
+#include <minecraft/src/common/world/level/ILevel.hpp>
+#include <minecraft/src/common/world/level/levelgen/structure/StructureFeatureRegistry.hpp>
 #include <minecraft/src/common/world/actor/Actor.hpp>
 #include <minecraft/src/common/nbt/CompoundTag.hpp>
 #include <minecraft/src/common/server/ServerPlayer.hpp>
-#include <minecraft/src/common/world/level/DimensionManager.hpp>
-#include <minecraft/src/common/world/level/levelgen/WorldGenerator.hpp>
-#include <minecraft/src/common/world/level/levelgen/structure/StructureFeatureRegistry.hpp>
-#include <minecraft/src/common/world/level/ChunkPos.hpp>
-#include <minecraft/src/common/world/level/ILevel.hpp>
-#include <memory>
-#include <minecraft/src/common/world/phys/Vec2.hpp>
 #include <minecraft/src/common/dataloadhelper/DefaultDataLoadHelper.hpp>
-#include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
 #include <minecraft/src/common/network/ServerNetworkHandler.hpp>
-#include <minecraft/src/common/world/level/dimension/VanillaDimensions.hpp>
 #include <minecraft/src/common/network/packet/ChangeDimensionPacket.hpp>
 #include <minecraft/src/common/world/level/dimension/DimensionBrightnessRamp.hpp>
-#include "F3Screen.hpp"
+#include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/VanillaDimensionFactory.hpp>
+#include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/OverworldDimension.hpp>
+#include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
 
-AmethystContext* amethyst;
+#include "F3Screen.hpp"
+#include <amethyst/runtime/ModContext.hpp>
+
 static DimensionType testDimensionID = DimensionType(0);
-static std::string testDimensionName = "overworld";
+static std::string testDimensionName = "test";
 
 class ILevel;
 class Scheduler;
@@ -185,8 +186,8 @@ void _loadNewPlayer(LambdaFields* a1) {
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
-    VanillaDimensions::DimensionMap->clear();
-    VanillaDimensions::DimensionMap->emplace(testDimensionName, testDimensionID);
+    //VanillaDimensions::DimensionMap->clear();
+    //VanillaDimensions::DimensionMap->emplace(testDimensionName, testDimensionID);
 
 	// register a dimension with the overworld name because custom names don't seem to get created
 	// I suspect they are registered on demand when loading into the dimension.
@@ -212,13 +213,7 @@ WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimensi
 SafetyHookInline _VanillaDimensions_toString;
 
 std::string VanillaDimensions_toString(const DimensionType& dimId) {
-    
     if (dimId.runtimeID == testDimensionID.runtimeID) return testDimensionName;
-
-    if (dimId.runtimeID == 0) return "overworld";
-    if (dimId.runtimeID == 1) return "nether";
-    if (dimId.runtimeID == 2) return "the end";
-    if (dimId.runtimeID == 3) return "undefined";
 
     Assert("Unknown DimensionType: {}", dimId.runtimeID);
 }
@@ -246,38 +241,51 @@ Bedrock::Result<DimensionType> VanillaDimensions_fromSerializedInt(Bedrock::Resu
     return Bedrock::Result<DimensionType>(dimType);
 }
 
-SafetyHookInline _ChangeDimensionPacket_write;
+//SafetyHookInline _ChangeDimensionPacket_write;
+//
+//void ChangeDimensionPacket_write(ChangeDimensionPacket* self, BinaryStream& stream) {
+//    Log::Info("ChangeDimensionPacket::write: {}", self->mDimensionId.runtimeID);
+//
+//    stream.writeUnsignedVarInt32(self->mDimensionId.runtimeID);
+//    stream.write(self->mPos);
+//    stream.write(self->mRespawn);
+//}
 
-void ChangeDimensionPacket_write(ChangeDimensionPacket* self, BinaryStream& stream) {
-    Log::Info("ChangeDimensionPacket::write: {}", self->mDimensionId.runtimeID);
+//SafetyHookInline _MinecraftPackets_createPacket;
+//
+//std::shared_ptr<Packet> MinecraftPackets_createPacket(MinecraftPacketIds packetID) {
+//    auto packet = _MinecraftPackets_createPacket.call<std::shared_ptr<Packet>>(packetID);
+//    Log::Info("[MinecraftPackets::createPacket] {}", packet->getName());
+//    return packet;
+//}
 
-    stream.writeUnsignedVarInt32(self->mDimensionId.runtimeID);
-    stream.write(self->mPos);
-    stream.write(self->mRespawn);
+SafetyHookInline _registerLightImageBuilders;
+
+void registerLightImageBuilders(Factory<BaseLightTextureImageBuilder, Level&, Scheduler&>* factory) {
+    _registerLightImageBuilders.call(factory);
+
+    auto& func = factory->mFactoryMap["overworld"];
+    factory->registerFactory(testDimensionName, func);
+
+    for (auto& item : factory->mFactoryMap) {
+        Log::Info("fefeijfnek: {}", item.first);
+    }
+
+    Log::Info("registerLightImageBuilders");
 }
 
-SafetyHookInline _MinecraftPackets_createPacket;
-
-std::shared_ptr<Packet> MinecraftPackets_createPacket(MinecraftPacketIds packetID) {
-    auto packet = _MinecraftPackets_createPacket.call<std::shared_ptr<Packet>>(packetID);
-    Log::Info("[MinecraftPackets::createPacket] {}", packet->getName());
-    return packet;
-}
-
-ModFunction void Initialize(AmethystContext* _amethyst)
+ModFunction void Initialize(AmethystContext& amethyst)
 {
-	InitializeVtablePtrs();
-	amethyst = _amethyst;
+    Amethyst::InitializeAmethystMod(amethyst);
 
-	HookManager& hooks = *amethyst->mHookManager;
+	auto& hooks = Amethyst::GetHookManager();
+    auto& events = Amethyst::GetEventBus();
 
 	hooks.CreateHookAbsolute(_registerDimensionTypes, SlideAddress(0x40818E0), &registerDimensionTypes);
     hooks.CreateHookAbsolute(__loadNewPlayer, SlideAddress(0x174AFE0), &_loadNewPlayer);
 
     hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
     hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
-
-    // todo: hook fromString..
 
     hooks.RegisterFunction<&VanillaDimensions::toString>("40 53 48 83 EC ? 4C 63 02");
     hooks.CreateHook<&VanillaDimensions::toString>(_VanillaDimensions_toString, &VanillaDimensions_toString);
@@ -288,6 +296,9 @@ ModFunction void Initialize(AmethystContext* _amethyst)
     hooks.RegisterFunction<&VanillaDimensions::fromSerializedInt>("48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B D9 48 8D 4D");
     hooks.CreateHook<&VanillaDimensions::fromSerializedInt>(_VanillaDimensions_fromSerializedInt, &VanillaDimensions_fromSerializedInt);
 
+    hooks.RegisterFunction<&LightTextureImageBuilderFactory::registerLightImageBuilders>(SlideAddress(0x3FE9B30));
+    hooks.CreateHook<&LightTextureImageBuilderFactory::registerLightImageBuilders>(_registerLightImageBuilders, &registerLightImageBuilders);
+
     // Unused:
 
     //hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
@@ -296,6 +307,5 @@ ModFunction void Initialize(AmethystContext* _amethyst)
     //hooks.RegisterFunction<&MinecraftPackets::createPacket>("40 53 48 83 EC ? 45 33 C0 48 8B D9 FF CA 81 FA");
     //hooks.CreateHook<&MinecraftPackets::createPacket>(_MinecraftPackets_createPacket, &MinecraftPackets_createPacket);
 
-    auto& events = *amethyst->mEventManager;
-    events.afterRenderUI.AddListener(&RenderF3);
+    events.AddListener<AfterRenderUIEvent>(&RenderF3);
 }
