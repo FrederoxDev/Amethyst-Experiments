@@ -108,17 +108,21 @@ public:
         Log::Info("custom ctor");
 	};
 
-    //TestOverworldDimension(ILevel& level, Scheduler& callbackContext) : OverworldDimension(level, callbackContext) {}
-
-    virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
-        return std::make_unique<TestGenerator>(*this);
+    TestOverworldDimension(ILevel& level, Scheduler& callbackContext) 
+        : OverworldDimension(level, callbackContext) 
+    {
+        Log::Info("hi");
     }
+
+    //virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
+    //    return std::make_unique<TestGenerator>(*this);
+    //}
 };
 
 OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
     DimensionHeightRange heightRange;
-    heightRange.mMin = 0;
-    heightRange.mMax = 255;
+    heightRange.mMin = -64;
+    heightRange.mMax = 320;
 
     //return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, scheduler));
     return OwnerPtr<Dimension>(std::make_shared<TestOverworldDimension>(level, testDimensionID, heightRange, scheduler, testDimensionName));
