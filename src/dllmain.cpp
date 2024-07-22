@@ -22,11 +22,12 @@
 #include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/VanillaDimensionFactory.hpp>
 #include <minecraft/src-vanilla/vanilla_shared/common/world/level/dimension/OverworldDimension.hpp>
 #include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
+#include <minecraft/src-client/common/client/renderer/block/tessellationPipeline/VanillaBlockTesellation.hpp>
 
 #include "F3Screen.hpp"
 #include <amethyst/runtime/ModContext.hpp>
 
-static DimensionType testDimensionID = DimensionType(0);
+static DimensionType testDimensionID = DimensionType(4);
 static std::string testDimensionName = "test";
 
 class ILevel;
@@ -107,16 +108,6 @@ public:
         mDimensionBrightnessRamp->buildBrightnessRamp();
         Log::Info("custom ctor");
 	};
-
-    TestOverworldDimension(ILevel& level, Scheduler& callbackContext) 
-        : OverworldDimension(level, callbackContext) 
-    {
-        Log::Info("hi");
-    }
-
-    //virtual std::unique_ptr<class WorldGenerator> createGenerator(const br::worldgen::StructureSetRegistry&) override {
-    //    return std::make_unique<TestGenerator>(*this);
-    //}
 };
 
 OwnerPtr<Dimension> makeTestDimension(ILevel& level, Scheduler& scheduler) {
@@ -190,29 +181,26 @@ void _loadNewPlayer(LambdaFields* a1) {
 }
 
 void registerDimensionTypes(OwnerPtrFactory<Dimension, ILevel&, Scheduler&>* factory, void* a, void* b, void* c) {
-    //VanillaDimensions::DimensionMap->clear();
-    //VanillaDimensions::DimensionMap->emplace(testDimensionName, testDimensionID);
+    if (!VanillaDimensions::DimensionMap->contains(testDimensionName)) {
+        VanillaDimensions::DimensionMap->emplace(testDimensionName, testDimensionID);
+    }
 
 	// register a dimension with the overworld name because custom names don't seem to get created
 	// I suspect they are registered on demand when loading into the dimension.
 	//_registerDimensionTypes.call(factory, a, b, c);
     factory->registerFactory(testDimensionName, makeTestDimension);
-
-    Log::Info("0x{:x}", (uintptr_t)&factory->mFactoryMap);
-
-	Log::Info("registerDimensionTypes 0x{:x} 0x{:x} 0x{:x} 0x{:x}", (uintptr_t)factory, (uintptr_t)a, (uintptr_t)b, (uintptr_t)c);
 }
 
-SafetyHookInline _getOrCreateDimension;
-
-WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimension>* result, DimensionType dimType) {
-    Log::Info("getOrCreateDimension, creating dimType {:d}", dimType.runtimeID);
-
-    result = _getOrCreateDimension.call<WeakRef<Dimension>*>(self, result, dimType);
-
-    Log::Info("getOrCreateDimension result: 0x{:x}", (uint64_t)result->get());
-    return result;
-}
+//SafetyHookInline _getOrCreateDimension;
+//
+//WeakRef<Dimension>* getOrCreateDimension(DimensionManager* self, WeakRef<Dimension>* result, DimensionType dimType) {
+//    Log::Info("getOrCreateDimension, creating dimType {:d}", dimType.runtimeID);
+//
+//    result = _getOrCreateDimension.call<WeakRef<Dimension>*>(self, result, dimType);
+//
+//    Log::Info("getOrCreateDimension result: 0x{:x}", (uint64_t)result->get());
+//    return result;
+//}
 
 SafetyHookInline _VanillaDimensions_toString;
 
@@ -245,15 +233,15 @@ Bedrock::Result<DimensionType> VanillaDimensions_fromSerializedInt(Bedrock::Resu
     return Bedrock::Result<DimensionType>(dimType);
 }
 
-//SafetyHookInline _ChangeDimensionPacket_write;
-//
-//void ChangeDimensionPacket_write(ChangeDimensionPacket* self, BinaryStream& stream) {
-//    Log::Info("ChangeDimensionPacket::write: {}", self->mDimensionId.runtimeID);
-//
-//    stream.writeUnsignedVarInt32(self->mDimensionId.runtimeID);
-//    stream.write(self->mPos);
-//    stream.write(self->mRespawn);
-//}
+SafetyHookInline _ChangeDimensionPacket_write;
+
+void ChangeDimensionPacket_write(ChangeDimensionPacket* self, BinaryStream& stream) {
+    Log::Info("ChangeDimensionPacket::write: {}", self->mDimensionId.runtimeID);
+
+    stream.writeUnsignedVarInt32(self->mDimensionId.runtimeID);
+    stream.write(self->mPos);
+    stream.write(self->mRespawn);
+}
 
 //SafetyHookInline _MinecraftPackets_createPacket;
 //
@@ -278,6 +266,24 @@ void registerLightImageBuilders(Factory<BaseLightTextureImageBuilder, Level&, Sc
     Log::Info("registerLightImageBuilders");
 }
 
+SafetyHookInline _createWorldPipelineDescription;
+
+void* createWorldPipelineDescription(
+    void* a1,
+    void* a2,
+    const DimensionType* dimId,
+    BakedBlockLightType lightingType,
+    BaseLightTextureImageBuilder* lightBuilder
+) {
+    const DimensionType* newDimId = &VanillaDimensions::Overworld;
+
+    if (dimId->runtimeID == testDimensionID.runtimeID) {
+        return _createWorldPipelineDescription.call<void*>(a1, a2, newDimId, lightingType, lightBuilder);
+    }
+
+    return _createWorldPipelineDescription.call<void*>(a1, a2, dimId, lightingType, lightBuilder);
+}
+
 ModFunction void Initialize(AmethystContext& amethyst)
 {
     Amethyst::InitializeAmethystMod(amethyst);
@@ -288,8 +294,8 @@ ModFunction void Initialize(AmethystContext& amethyst)
 	hooks.CreateHookAbsolute(_registerDimensionTypes, SlideAddress(0x40818E0), &registerDimensionTypes);
     hooks.CreateHookAbsolute(__loadNewPlayer, SlideAddress(0x174AFE0), &_loadNewPlayer);
 
-    hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
-    hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
+    //hooks.RegisterFunction<&DimensionManager::getOrCreateDimension>("48 89 5C 24 ? 44 89 44 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B FA 4C 8B F9");
+    //hooks.CreateHook<&DimensionManager::getOrCreateDimension>(_getOrCreateDimension, &getOrCreateDimension);
 
     hooks.RegisterFunction<&VanillaDimensions::toString>("40 53 48 83 EC ? 4C 63 02");
     hooks.CreateHook<&VanillaDimensions::toString>(_VanillaDimensions_toString, &VanillaDimensions_toString);
@@ -303,10 +309,11 @@ ModFunction void Initialize(AmethystContext& amethyst)
     hooks.RegisterFunction<&LightTextureImageBuilderFactory::registerLightImageBuilders>(SlideAddress(0x3FE9B30));
     hooks.CreateHook<&LightTextureImageBuilderFactory::registerLightImageBuilders>(_registerLightImageBuilders, &registerLightImageBuilders);
 
-    // Unused:
+    hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
+    hooks.CreateHook<&ChangeDimensionPacket::write>(_ChangeDimensionPacket_write, &ChangeDimensionPacket_write);
 
-    //hooks.RegisterFunction<&ChangeDimensionPacket::write>("48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 39 05");
-    //hooks.CreateHook<&ChangeDimensionPacket::write>(_ChangeDimensionPacket_write, &ChangeDimensionPacket_write);
+    hooks.RegisterFunction<&VanillaBlockTessellation::createWorldPipelineDescription>("48 89 5C 24 ? 57 48 83 EC ? 66 C7 41");
+    hooks.CreateHook<&VanillaBlockTessellation::createWorldPipelineDescription>(_createWorldPipelineDescription, &createWorldPipelineDescription);
 
     //hooks.RegisterFunction<&MinecraftPackets::createPacket>("40 53 48 83 EC ? 45 33 C0 48 8B D9 FF CA 81 FA");
     //hooks.CreateHook<&MinecraftPackets::createPacket>(_MinecraftPackets_createPacket, &MinecraftPackets_createPacket);
